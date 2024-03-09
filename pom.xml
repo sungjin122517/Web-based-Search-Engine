@@ -18,6 +18,12 @@
   <dependencies>
 
     <dependency>
+      <groupId>org.htmlparser</groupId>
+      <artifactId>htmlparser</artifactId>
+      <version>1.6</version>
+    </dependency>
+
+    <dependency>
       <groupId>jdbm</groupId>
       <artifactId>jdbm</artifactId>
       <version>1.0</version>
