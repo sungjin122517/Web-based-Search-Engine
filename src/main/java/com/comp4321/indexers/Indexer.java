@@ -1,6 +1,7 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.HashSet;
 
 import org.htmlparser.util.ParserException;
 
@@ -69,12 +70,10 @@ public class Indexer implements AutoCloseable {
             // Add the metadata to METADATA_MAP
             metadataIndexer.setMetadata(docId, new Metadata(curLastModified));
 
-            // Add the links to PARENT_TO_CHILD and CHILD_TO_PARENT
-            crawler.extractLinks().stream()
-                    .map(urlIndexer::getOrCreateDocumentId)
-                    .forEach(childId -> {
-                        linkIndexer.addLink(docId, childId);
-                    });
+            // Set the links in PARENT_TO_CHILD and CHILD_TO_PARENT
+            final HashSet<Integer> links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
+                    .collect(HashSet::new, HashSet::add, HashSet::addAll);
+            linkIndexer.setLinks(docId, links);
 
         } catch (ParserException e) {
             e.printStackTrace();

@@ -1,7 +1,7 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashSet;
 
 import jdbm.htree.HTree;
 
@@ -16,31 +16,62 @@ public class LinkIndexer {
         this.maxPages = maxPages;
     }
 
-    public void addLink(int parent, int child) {
+    private void addChildLink(int parent, int child) {
         if (parent == child)
             return;
         if (parent > maxPages || child > maxPages)
             return;
 
-        final var parentKey = Integer.valueOf(parent);
         final var childKey = Integer.valueOf(child);
 
         try {
             @SuppressWarnings("unchecked")
-            var childValue = (ArrayList<Integer>) parentToChild.get(parentKey);
-            if (childValue == null)
-                childValue = new ArrayList<Integer>();
+            var parentsValue = (HashSet<Integer>) childToParent.get(childKey);
+            if (parentsValue == null)
+                parentsValue = new HashSet<Integer>();
 
-            childValue.add(child);
-            parentToChild.put(parentKey, childValue);
+            parentsValue.add(parent);
+            childToParent.put(childKey, parentsValue);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    private void removeChildLink(int parent, int child) {
+        if (parent == child)
+            return;
+        if (parent > maxPages || child > maxPages)
+            return;
+
+        final var childKey = Integer.valueOf(child);
+
+        try {
             @SuppressWarnings("unchecked")
-            var parentValue = (ArrayList<Integer>) childToParent.get(childKey);
-            if (parentValue == null)
-                parentValue = new ArrayList<Integer>();
+            final var parentsValue = (HashSet<Integer>) childToParent.get(childKey);
+            if (parentsValue == null)
+                return;
 
-            parentValue.add(parent);
-            childToParent.put(childKey, parentValue);
+            parentsValue.remove(parent);
+            childToParent.put(childKey, parentsValue);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void setLinks(int docId, HashSet<Integer> links) {
+        if (docId > maxPages)
+            return;
+
+        try {
+            // Get and remove old links
+            @SuppressWarnings("unchecked")
+            final var oldLinks = (HashSet<Integer>) parentToChild.get(Integer.valueOf(docId));
+            if (oldLinks != null)
+                oldLinks.stream().forEach(child -> removeChildLink(docId, child));
+
+            // Overwrite with new links
+            parentToChild.put(Integer.valueOf(docId), links);
+            links.stream().forEach(child -> addChildLink(docId, child));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -52,7 +83,7 @@ public class LinkIndexer {
         var parentKey = (Integer) parentKeys.next();
         while (parentKey != null) {
             @SuppressWarnings("unchecked")
-            final var childEntry = (ArrayList<Integer>) parentToChild.get(parentKey);
+            final var childEntry = (HashSet<Integer>) parentToChild.get(parentKey);
             System.out.println(parentKey + " -> " + childEntry.toString());
 
             parentKey = (Integer) parentKeys.next();
@@ -64,7 +95,7 @@ public class LinkIndexer {
         var childKey = (Integer) childKeys.next();
         while (childKey != null) {
             @SuppressWarnings("unchecked")
-            final var parentEntry = (ArrayList<Integer>) childToParent.get(childKey);
+            final var parentEntry = (HashSet<Integer>) childToParent.get(childKey);
             System.out.println(childKey + " -> " + parentEntry.toString());
 
             childKey = (Integer) childKeys.next();

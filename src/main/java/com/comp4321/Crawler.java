@@ -57,6 +57,7 @@ public class Crawler {
 
         queue.add(url);
         visited.add(url);
+        indexer.accept(url);
 
         final var lb = new LinkBean();
         while (!queue.isEmpty() && visited.size() < maxPages) {
