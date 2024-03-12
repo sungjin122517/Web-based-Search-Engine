@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.function.Consumer;
 
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.beans.StringBean;
@@ -15,7 +16,7 @@ import org.htmlparser.util.ParserException;
 public class Crawler {
     public final String url;
 
-    Crawler(String _url) {
+    public Crawler(String _url) {
         url = _url;
     }
 
@@ -38,30 +39,27 @@ public class Crawler {
         return Arrays.stream(lb.getLinks()).map(URL::toString).toList();
     }
 
-    public List<String> bfs(int maxPages) throws ParserException {
+    public void bfs(int maxPages, Consumer<String> indexer) throws ParserException {
         final var queue = new ArrayDeque<String>();
         final var visited = new HashSet<String>();
-        final var result = new ArrayList<String>();
 
         queue.add(url);
         visited.add(url);
-        result.add(url);
 
         final var lb = new LinkBean();
-        while (!queue.isEmpty() && result.size() < maxPages) {
+        while (!queue.isEmpty() && visited.size() < maxPages) {
             final var curURL = queue.remove();
             lb.setURL(curURL);
 
             Arrays.stream(lb.getLinks())
+                    .limit(maxPages - visited.size())
                     .map(URL::toString)
                     .filter(link -> !visited.contains(link))
                     .forEach(link -> {
                         queue.add(link);
                         visited.add(link);
-                        result.add(link);
+                        indexer.accept(link);
                     });
         }
-
-        return result;
     }
 }

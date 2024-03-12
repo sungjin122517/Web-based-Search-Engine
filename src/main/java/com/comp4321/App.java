@@ -1,17 +1,23 @@
 package com.comp4321;
 
+import java.io.IOException;
+
 import org.htmlparser.util.ParserException;
+
+import com.comp4321.indexers.Indexer;
 
 public class App {
     public static void main(String[] arg) {
-        String baseURL = "https://www.cse.ust.hk/~kwtleung/COMP4321/testpage.htm";
-        try {
+        try (final var indexer = new Indexer()) {
+            String baseURL = "https://www.cse.ust.hk/~kwtleung/COMP4321/testpage.htm";
             final var crawler = new Crawler(baseURL);
-            final var bfsResult = crawler.bfs(1000);
-            System.out.println("Total pages: " + bfsResult.size());
-            bfsResult.stream().forEach(System.out::println);
-        } catch (ParserException e) {
-            System.err.println(e.toString());
+
+            crawler.bfs(30, indexer::indexDocument);
+            indexer.printAll();
+
+        } catch (ParserException | IOException e) {
+            e.printStackTrace();
         }
+
     }
 }
