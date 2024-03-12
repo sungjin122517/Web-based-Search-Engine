@@ -1,6 +1,9 @@
 package com.comp4321;
 
 import java.net.URL;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +40,15 @@ public class Crawler {
         lb.setURL(url);
 
         return Arrays.stream(lb.getLinks()).map(URL::toString).toList();
+    }
+
+    public ZonedDateTime getLastModified() throws ParserException {
+        final var lb = new LinkBean();
+        lb.setURL(url);
+
+        // HTTP header "Last-Modified" is in GMT
+        final var instant = Instant.ofEpochMilli(lb.getConnection().getLastModified());
+        return ZonedDateTime.ofInstant(instant, ZoneId.of("GMT"));
     }
 
     public void bfs(int maxPages, Consumer<String> indexer) throws ParserException {
