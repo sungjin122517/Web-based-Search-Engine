@@ -22,10 +22,10 @@ public class Indexer implements AutoCloseable {
     private final URLIndexer urlIndexer;
     private final LinkIndexer linkIndexer;
 
-    public Indexer() throws IOException {
+    public Indexer(int maxPages) throws IOException {
         recman = RecordManagerFactory.createRecordManager(DB_NAME);
-        urlIndexer = new URLIndexer(getBTree(URL_MAP));
-        linkIndexer = new LinkIndexer(getHTree(PARENT_TO_CHILD), getHTree(CHILD_TO_PARENT));
+        urlIndexer = new URLIndexer(getBTree(URL_MAP), maxPages);
+        linkIndexer = new LinkIndexer(getHTree(PARENT_TO_CHILD), getHTree(CHILD_TO_PARENT), maxPages);
     }
 
     private BTree getBTree(String name) throws IOException {
@@ -60,7 +60,6 @@ public class Indexer implements AutoCloseable {
             // Add the links to PARENT_TO_CHILD and CHILD_TO_PARENT
             crawler.extractLinks().stream()
                     .map(urlIndexer::getOrCreateDocumentId)
-                    .filter(childId -> childId != docId)
                     .forEach(childId -> {
                         linkIndexer.addLink(docId, childId);
                     });

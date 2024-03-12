@@ -52,13 +52,13 @@ public class Crawler {
             lb.setURL(curURL);
 
             Arrays.stream(lb.getLinks())
-                    .limit(maxPages - visited.size())
                     .map(URL::toString)
-                    .filter(link -> !visited.contains(link))
                     .forEach(link -> {
-                        queue.add(link);
-                        visited.add(link);
-                        indexer.accept(link);
+                        if (!visited.contains(link)) {
+                            queue.add(link);
+                            visited.add(link);
+                            indexer.accept(link);
+                        }
                     });
         }
     }

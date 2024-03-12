@@ -7,9 +7,11 @@ import jdbm.helper.Tuple;
 
 public class URLIndexer {
     private final BTree urlMap;
+    private final int maxPages;
 
-    public URLIndexer(BTree urlMap) {
+    public URLIndexer(BTree urlMap, int maxPages) {
         this.urlMap = urlMap;
+        this.maxPages = maxPages;
     }
 
     public int getOrCreateDocumentId(String url) {
@@ -19,7 +21,8 @@ public class URLIndexer {
                 return (int) value;
 
             final var docId = urlMap.size() + 1;
-            urlMap.insert(url, docId, false);
+            if (docId <= maxPages)
+                urlMap.insert(url, docId, false);
             return docId;
         } catch (IOException e) {
             throw new RuntimeException(e);

@@ -8,13 +8,20 @@ import jdbm.htree.HTree;
 public class LinkIndexer {
     private final HTree parentToChild;
     private final HTree childToParent;
+    private final int maxPages;
 
-    public LinkIndexer(HTree parentToChild, HTree childToParent) {
+    public LinkIndexer(HTree parentToChild, HTree childToParent, int maxPages) {
         this.parentToChild = parentToChild;
         this.childToParent = childToParent;
+        this.maxPages = maxPages;
     }
 
     public void addLink(int parent, int child) {
+        if (parent == child)
+            return;
+        if (parent > maxPages || child > maxPages)
+            return;
+
         final var parentKey = Integer.valueOf(parent);
         final var childKey = Integer.valueOf(child);
 
