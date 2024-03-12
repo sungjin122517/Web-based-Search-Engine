@@ -1,27 +1,17 @@
 package com.comp4321;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import org.htmlparser.util.ParserException;
 
 public class App {
     public static void main(String[] arg) {
-        StopStem stopStem = new StopStem("stopwords.txt");
-        String input = "";
+        String baseURL = "https://www.cse.ust.hk/~kwtleung/COMP4321/testpage.htm";
         try {
-            do {
-                System.out.print("Please enter a single English word: ");
-                BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
-                input = in.readLine();
-                if (input.length() > 0) {
-                    if (stopStem.isStopWord(input))
-                        System.out.println("It should be stopped");
-                    else
-                        System.out.println("The stem of it is \"" + stopStem.stem(input) + "\"");
-                }
-            } while (input.length() > 0);
-        } catch (IOException ioe) {
-            System.err.println(ioe.toString());
+            final var crawler = new Crawler(baseURL);
+            final var bfsResult = crawler.bfs(1000);
+            System.out.println("Total pages: " + bfsResult.size());
+            bfsResult.stream().forEach(System.out::println);
+        } catch (ParserException e) {
+            System.err.println(e.toString());
         }
     }
 }
