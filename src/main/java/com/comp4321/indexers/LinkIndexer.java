@@ -2,15 +2,17 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Set;
 
-import jdbm.htree.HTree;
+import com.comp4321.jdbm.SafeHTree;
 
 public class LinkIndexer {
-    private final HTree parentToChild;
-    private final HTree childToParent;
+    private final SafeHTree<Integer, Set<Integer>> parentToChild;
+    private final SafeHTree<Integer, Set<Integer>> childToParent;
     private final int maxPages;
 
-    public LinkIndexer(HTree parentToChild, HTree childToParent, int maxPages) {
+    public LinkIndexer(SafeHTree<Integer, Set<Integer>> parentToChild, SafeHTree<Integer, Set<Integer>> childToParent,
+            int maxPages) {
         this.parentToChild = parentToChild;
         this.childToParent = childToParent;
         this.maxPages = maxPages;
@@ -25,8 +27,7 @@ public class LinkIndexer {
         final var childKey = Integer.valueOf(child);
 
         try {
-            @SuppressWarnings("unchecked")
-            var parentsValue = (HashSet<Integer>) childToParent.get(childKey);
+            var parentsValue = childToParent.get(childKey);
             if (parentsValue == null)
                 parentsValue = new HashSet<Integer>();
 
@@ -46,8 +47,7 @@ public class LinkIndexer {
         final var childKey = Integer.valueOf(child);
 
         try {
-            @SuppressWarnings("unchecked")
-            final var parentsValue = (HashSet<Integer>) childToParent.get(childKey);
+            final var parentsValue = childToParent.get(childKey);
             if (parentsValue == null)
                 return;
 
@@ -58,14 +58,13 @@ public class LinkIndexer {
         }
     }
 
-    public void setLinks(int docId, HashSet<Integer> links) {
+    public void setLinks(int docId, Set<Integer> links) {
         if (docId > maxPages)
             return;
 
         try {
             // Get and remove old links
-            @SuppressWarnings("unchecked")
-            final var oldLinks = (HashSet<Integer>) parentToChild.get(Integer.valueOf(docId));
+            final var oldLinks = parentToChild.get(Integer.valueOf(docId));
             if (oldLinks != null)
                 oldLinks.stream().forEach(child -> removeChildLink(docId, child));
 
@@ -79,26 +78,14 @@ public class LinkIndexer {
 
     public void printAll() throws IOException {
         System.out.println("PARENT_TO_CHILD:");
-        final var parentKeys = parentToChild.keys();
-        var parentKey = (Integer) parentKeys.next();
-        while (parentKey != null) {
-            @SuppressWarnings("unchecked")
-            final var childEntry = (HashSet<Integer>) parentToChild.get(parentKey);
-            System.out.println(parentKey + " -> " + childEntry.toString());
-
-            parentKey = (Integer) parentKeys.next();
+        for (final var entry : parentToChild) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue().toString());
         }
         System.out.println();
 
         System.out.println("CHILD_TO_PARENT:");
-        final var childKeys = childToParent.keys();
-        var childKey = (Integer) childKeys.next();
-        while (childKey != null) {
-            @SuppressWarnings("unchecked")
-            final var parentEntry = (HashSet<Integer>) childToParent.get(childKey);
-            System.out.println(childKey + " -> " + parentEntry.toString());
-
-            childKey = (Integer) childKeys.next();
+        for (final var entry : childToParent) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue().toString());
         }
         System.out.println();
     }

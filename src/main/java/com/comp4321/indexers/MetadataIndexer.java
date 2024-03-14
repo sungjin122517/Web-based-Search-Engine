@@ -2,13 +2,13 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 
-import jdbm.htree.HTree;
+import com.comp4321.jdbm.SafeHTree;
 
 public class MetadataIndexer {
-    private final HTree metadataMap;
+    private final SafeHTree<Integer, Metadata> metadataMap;
     private final int maxPages;
 
-    public MetadataIndexer(HTree metadataMap, int maxPages) {
+    public MetadataIndexer(SafeHTree<Integer, Metadata> metadataMap, int maxPages) {
         this.metadataMap = metadataMap;
         this.maxPages = maxPages;
     }
@@ -34,12 +34,8 @@ public class MetadataIndexer {
 
     public void printAll() throws IOException {
         System.out.println("METADATA_MAP:");
-        final var docIds = metadataMap.keys();
-        var docId = (Integer) docIds.next();
-        while (docId != null) {
-            final var metadata = (Metadata) metadataMap.get(docId);
-            System.out.println(docId + " -> " + metadata.toString());
-            docId = (Integer) docIds.next();
+        for (final var entry : metadataMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue().toString());
         }
         System.out.println();
     }

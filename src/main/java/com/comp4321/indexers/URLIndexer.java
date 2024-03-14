@@ -2,14 +2,13 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 
-import jdbm.btree.BTree;
-import jdbm.helper.Tuple;
+import com.comp4321.jdbm.SafeBTree;
 
 public class URLIndexer {
-    private final BTree urlMap;
+    private final SafeBTree<String, Integer> urlMap;
     private final int maxPages;
 
-    public URLIndexer(BTree urlMap, int maxPages) {
+    public URLIndexer(SafeBTree<String, Integer> urlMap, int maxPages) {
         this.urlMap = urlMap;
         this.maxPages = maxPages;
     }
@@ -22,7 +21,7 @@ public class URLIndexer {
 
             final var docId = urlMap.size() + 1;
             if (docId <= maxPages)
-                urlMap.insert(url, docId, false);
+                urlMap.insert(url, docId);
             return docId;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -31,9 +30,7 @@ public class URLIndexer {
 
     public void printAll() throws IOException {
         System.out.println("URL_MAP:");
-        final var urlBrowser = urlMap.browse();
-        Tuple urlTuple = new Tuple();
-        while (urlBrowser.getNext(urlTuple))
+        for (final var urlTuple : urlMap)
             System.out.println(urlTuple.getKey() + " -> " + urlTuple.getValue());
         System.out.println();
     }

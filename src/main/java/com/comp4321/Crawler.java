@@ -67,7 +67,7 @@ public class Crawler {
             Arrays.stream(lb.getLinks())
                     .map(URL::toString)
                     .forEach(link -> {
-                        if (!visited.contains(link)) {
+                        if (!visited.contains(link) && visited.size() < maxPages) {
                             queue.add(link);
                             visited.add(link);
                             indexer.accept(link);

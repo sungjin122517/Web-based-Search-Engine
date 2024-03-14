@@ -1,17 +1,17 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.Comparator;
+import java.util.stream.Collectors;
 
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.Crawler;
+import com.comp4321.jdbm.SafeBTree;
+import com.comp4321.jdbm.SafeHTree;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
-import jdbm.btree.BTree;
-import jdbm.helper.StringComparator;
-import jdbm.htree.HTree;
 
 public class Indexer implements AutoCloseable {
     private static final String DB_NAME = "indexes";
@@ -27,31 +27,11 @@ public class Indexer implements AutoCloseable {
 
     public Indexer(int maxPages) throws IOException {
         recman = RecordManagerFactory.createRecordManager(DB_NAME);
-        urlIndexer = new URLIndexer(getBTree(URL_MAP), maxPages);
-        linkIndexer = new LinkIndexer(getHTree(PARENT_TO_CHILD), getHTree(CHILD_TO_PARENT), maxPages);
-        metadataIndexer = new MetadataIndexer(getHTree(METADATA_MAP), maxPages);
-    }
-
-    private BTree getBTree(String name) throws IOException {
-        long recid = recman.getNamedObject(name);
-        if (recid != 0) {
-            return BTree.load(recman, recid);
-        } else {
-            final var btree = BTree.createInstance(recman, new StringComparator());
-            recman.setNamedObject(name, btree.getRecid());
-            return btree;
-        }
-    }
-
-    private HTree getHTree(String name) throws IOException {
-        long recid = recman.getNamedObject(name);
-        if (recid != 0) {
-            return HTree.load(recman, recid);
-        } else {
-            final var htree = HTree.createInstance(recman);
-            recman.setNamedObject(name, htree.getRecid());
-            return htree;
-        }
+        urlIndexer = new URLIndexer(new SafeBTree<String, Integer>(recman, URL_MAP, Comparator.naturalOrder()),
+                maxPages);
+        linkIndexer = new LinkIndexer(new SafeHTree<>(recman, PARENT_TO_CHILD),
+                new SafeHTree<>(recman, CHILD_TO_PARENT), maxPages);
+        metadataIndexer = new MetadataIndexer(new SafeHTree<>(recman, METADATA_MAP), maxPages);
     }
 
     public void indexDocument(String url) {
@@ -71,8 +51,8 @@ public class Indexer implements AutoCloseable {
             metadataIndexer.setMetadata(docId, new Metadata(curLastModified));
 
             // Set the links in PARENT_TO_CHILD and CHILD_TO_PARENT
-            final HashSet<Integer> links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
-                    .collect(HashSet::new, HashSet::add, HashSet::addAll);
+            final var links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
+                    .collect(Collectors.toSet());
             linkIndexer.setLinks(docId, links);
 
         } catch (ParserException e) {
