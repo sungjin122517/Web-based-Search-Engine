@@ -7,6 +7,8 @@ import java.util.stream.Collectors;
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.Crawler;
+import com.comp4321.StopStem;
+import com.comp4321.IRUtilities.Porter;
 import com.comp4321.jdbm.SafeBTree;
 import com.comp4321.jdbm.SafeHTree;
 
@@ -24,6 +26,9 @@ public class Indexer implements AutoCloseable {
     private final URLIndexer urlIndexer;
     private final LinkIndexer linkIndexer;
     private final MetadataIndexer metadataIndexer;
+
+    private final StopStem stopStem = new StopStem();
+    private final Porter porter = new Porter();
 
     public Indexer(int maxPages) throws IOException {
         recman = RecordManagerFactory.createRecordManager(DB_NAME);
@@ -54,6 +59,25 @@ public class Indexer implements AutoCloseable {
             final var links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
                     .collect(Collectors.toSet());
             linkIndexer.setLinks(docId, links);
+
+            // Extract title and words
+            System.out.println("Title:");
+            crawler.extractTitle()
+                    .stream()
+                    .filter(w -> !stopStem.isStopWord(w))
+                    .map(porter::stripAffixes)
+                    .forEach(System.out::println);
+            System.out.println();
+
+            System.out.println("Words:");
+            crawler.extractWords()
+                    .stream()
+                    .map(String::toLowerCase)
+                    .filter(w -> !stopStem.isStopWord(w))
+                    .map(porter::stripAffixes)
+                    .filter(w -> !w.isBlank())
+                    .forEach(System.out::println);
+            System.out.println();
 
         } catch (ParserException e) {
             e.printStackTrace();

@@ -5,13 +5,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.StringTokenizer;
 import java.util.function.Consumer;
 
+import org.htmlparser.Parser;
+import org.htmlparser.Tag;
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.beans.StringBean;
 import org.htmlparser.util.ParserException;
@@ -24,15 +24,41 @@ public class Crawler {
     }
 
     public List<String> extractWords() throws ParserException {
+        final var parser = new Parser();
+        parser.setURL(url);
+        final var body = parser.parse(node -> {
+            if (!(node instanceof Tag))
+                return false;
+
+            final var tag = (Tag) node;
+            return tag.getTagName().equalsIgnoreCase("BODY");
+        }).toNodeArray();
+
         final var sb = new StringBean();
-        sb.setURL(url);
-        sb.setLinks(false);
+        for (final var b : body)
+            b.accept(sb);
 
-        final var words = new ArrayList<String>();
-        final var tokenizer = new StringTokenizer(sb.getStrings());
-        tokenizer.asIterator().forEachRemaining(t -> words.add((String) t));
+        // Split by non-alphanumeric characters
+        return Arrays.asList(sb.getStrings().split("[\\W_]+"));
+    }
 
-        return words;
+    public List<String> extractTitle() throws ParserException {
+        final var parser = new Parser();
+        parser.setURL(url);
+        final var titles = parser.parse(node -> {
+            if (!(node instanceof Tag))
+                return false;
+
+            final var tag = (Tag) node;
+            return tag.getTagName().equalsIgnoreCase("TITLE");
+        }).toNodeArray();
+
+        final var sb = new StringBean();
+        for (final var title : titles)
+            title.accept(sb);
+
+        // Split by non-alphanumeric characters
+        return Arrays.asList(sb.getStrings().split("[\\W_]+"));
     }
 
     public List<String> extractLinks() throws ParserException {

@@ -34,7 +34,7 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
     }
 
     public void insert(K key, V value) throws IOException {
-        btree.insert(key, value, false);
+        btree.insert(key, value, true);
     }
 
     public void remove(K key) throws IOException {
