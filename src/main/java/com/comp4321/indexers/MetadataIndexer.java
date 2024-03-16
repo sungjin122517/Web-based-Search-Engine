@@ -66,7 +66,7 @@ public class MetadataIndexer {
     }
 
     public void printAll() throws IOException {
-        System.out.println("METADATA_MAP:");
+        System.out.println("DOCID_TO_METADATA:");
         for (final var entry : metadataMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue().toString());
         }

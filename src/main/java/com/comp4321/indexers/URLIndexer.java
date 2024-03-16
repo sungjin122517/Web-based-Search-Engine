@@ -36,11 +36,11 @@ public class URLIndexer {
      * @throws RuntimeException If an error occurs while retrieving or creating the
      *                          document ID.
      */
-    public int getOrCreateDocumentId(String url) {
+    public Integer getOrCreateDocumentId(String url) {
         try {
             final var value = urlToDocIdMap.find(url);
             if (value != null)
-                return (int) value;
+                return value;
 
             final var docId = urlToDocIdMap.size() + 1;
             urlToDocIdMap.insert(url, docId);
@@ -70,7 +70,7 @@ public class URLIndexer {
     }
 
     public void printAll() throws IOException {
-        System.out.println("URL_MAP:");
+        System.out.println("URL_TO_DOCID:");
         for (final var urlTuple : urlToDocIdMap)
             System.out.println(urlTuple.getKey() + " -> " + urlTuple.getValue());
         System.out.println();

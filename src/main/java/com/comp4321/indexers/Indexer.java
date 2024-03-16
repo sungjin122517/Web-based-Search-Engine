@@ -17,8 +17,9 @@ public class Indexer implements AutoCloseable {
 
     private final RecordManager recman;
     private final URLIndexer urlIndexer;
-    private final LinkIndexer linkIndexer;
     private final MetadataIndexer metadataIndexer;
+    private final LinkIndexer linkIndexer;
+    private final WordIndexer wordIndexer;
 
     private final StopStem stopStem = new StopStem();
     private final Porter porter = new Porter();
@@ -28,10 +29,12 @@ public class Indexer implements AutoCloseable {
         urlIndexer = new URLIndexer(recman);
         linkIndexer = new LinkIndexer(recman);
         metadataIndexer = new MetadataIndexer(recman);
+        wordIndexer = new WordIndexer(recman);
     }
 
     /**
-     * Indexes a document by crawling the given URL, extracting metadata, links, title, and words,
+     * Indexes a document by crawling the given URL, extracting metadata, links,
+     * title, and words,
      * and adding them to the respective indexes.
      *
      * @param url the URL of the document to be indexed
@@ -58,25 +61,23 @@ public class Indexer implements AutoCloseable {
             linkIndexer.addLinks(docId, links);
 
             // Add title and words to word index
-            System.out.println("Title:");
             crawler.extractTitle()
                     .stream()
                     .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
-                    .forEach(System.out::println);
-            System.out.println();
+                    .map(wordIndexer::getOrCreateId)
+                    .count();
 
-            System.out.println("Words:");
             crawler.extractWords()
                     .stream()
                     .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
-                    .forEach(System.out::println);
-            System.out.println();
+                    .map(wordIndexer::getOrCreateId)
+                    .count();
 
         } catch (ParserException e) {
             e.printStackTrace();
@@ -87,6 +88,7 @@ public class Indexer implements AutoCloseable {
         urlIndexer.printAll();
         metadataIndexer.printAll();
         linkIndexer.printAll();
+        wordIndexer.printAll();
     }
 
     @Override
