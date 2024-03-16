@@ -18,8 +18,8 @@ import jdbm.RecordManagerFactory;
 public class Indexer implements AutoCloseable {
     private static final String DB_NAME = "indexes";
     private static final String URL_MAP = "urlMap";
-    private static final String PARENT_TO_CHILD = "parentToChild";
-    private static final String CHILD_TO_PARENT = "childToParent";
+    private static final String PARENT_TO_CHILD_MAP = "parentToChildMap";
+    private static final String CHILD_TO_PARENT_MAP = "childToParentMap";
     private static final String METADATA_MAP = "metadataMap";
 
     private final RecordManager recman;
@@ -30,13 +30,12 @@ public class Indexer implements AutoCloseable {
     private final StopStem stopStem = new StopStem();
     private final Porter porter = new Porter();
 
-    public Indexer(int maxPages) throws IOException {
+    public Indexer() throws IOException {
         recman = RecordManagerFactory.createRecordManager(DB_NAME);
-        urlIndexer = new URLIndexer(new SafeBTree<String, Integer>(recman, URL_MAP, Comparator.naturalOrder()),
-                maxPages);
-        linkIndexer = new LinkIndexer(new SafeHTree<>(recman, PARENT_TO_CHILD),
-                new SafeHTree<>(recman, CHILD_TO_PARENT), maxPages);
-        metadataIndexer = new MetadataIndexer(new SafeHTree<>(recman, METADATA_MAP), maxPages);
+        urlIndexer = new URLIndexer(new SafeBTree<String, Integer>(recman, URL_MAP, Comparator.naturalOrder()));
+        linkIndexer = new LinkIndexer(new SafeHTree<>(recman, PARENT_TO_CHILD_MAP),
+                new SafeHTree<>(recman, CHILD_TO_PARENT_MAP));
+        metadataIndexer = new MetadataIndexer(new SafeHTree<>(recman, METADATA_MAP));
     }
 
     public void indexDocument(String url) {
@@ -52,20 +51,22 @@ public class Indexer implements AutoCloseable {
             if (metadata != null && !curLastModified.isAfter(metadata.lastModified()))
                 return;
 
-            // Add the metadata to METADATA_MAP
-            metadataIndexer.setMetadata(docId, new Metadata(curLastModified));
+            // Add the metadata to metadata index
+            metadataIndexer.addMetadata(docId, new Metadata(curLastModified));
 
-            // Set the links in PARENT_TO_CHILD and CHILD_TO_PARENT
+            // Add the links to link index
             final var links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
                     .collect(Collectors.toSet());
-            linkIndexer.setLinks(docId, links);
+            linkIndexer.addLinks(docId, links);
 
-            // Extract title and words
+            // Add title and words to word index
             System.out.println("Title:");
             crawler.extractTitle()
                     .stream()
+                    .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
                     .map(porter::stripAffixes)
+                    .filter(w -> !w.isBlank())
                     .forEach(System.out::println);
             System.out.println();
 

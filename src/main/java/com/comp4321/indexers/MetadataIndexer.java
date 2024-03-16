@@ -6,11 +6,9 @@ import com.comp4321.jdbm.SafeHTree;
 
 public class MetadataIndexer {
     private final SafeHTree<Integer, Metadata> metadataMap;
-    private final int maxPages;
 
-    public MetadataIndexer(SafeHTree<Integer, Metadata> metadataMap, int maxPages) {
+    public MetadataIndexer(SafeHTree<Integer, Metadata> metadataMap) {
         this.metadataMap = metadataMap;
-        this.maxPages = maxPages;
     }
 
     public Metadata getMetadata(int docId) {
@@ -21,12 +19,18 @@ public class MetadataIndexer {
         }
     }
 
-    public void setMetadata(int docId, Metadata metadata) {
-        if (docId > maxPages)
-            return;
-
+    public void addMetadata(int docId, Metadata metadata) {
         try {
+            removeMetadata(docId);
             metadataMap.put(docId, metadata);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void removeMetadata(int docId) {
+        try {
+            metadataMap.remove(docId);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

@@ -11,7 +11,7 @@ public class App {
         final var baseURL = "https://www.cse.ust.hk/~kwtleung/COMP4321/testpage.htm";
         final var maxPages = 30;
 
-        try (final var indexer = new Indexer(maxPages)) {
+        try (final var indexer = new Indexer()) {
             final var crawler = new Crawler(baseURL);
             crawler.bfs(maxPages, indexer::indexDocument);
             indexer.printAll();
