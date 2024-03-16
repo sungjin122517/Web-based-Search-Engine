@@ -9,8 +9,8 @@ import com.comp4321.jdbm.SafeHTree;
 import jdbm.RecordManager;
 
 public class LinkIndexer {
-    public static final String PARENT_TO_CHILD_MAP = "parentToChildMap";
-    public static final String CHILD_TO_PARENT_MAP = "childToParentMap";
+    public static final String PARENT_TO_CHILD = "parentToChild";
+    public static final String CHILD_TO_PARENT = "childToParent";
 
     private final SafeHTree<Integer, Set<Integer>> parentToChildMap;
     private final SafeHTree<Integer, Set<Integer>> childToParentMap;
@@ -22,7 +22,7 @@ public class LinkIndexer {
     }
 
     public LinkIndexer(RecordManager recman) throws IOException {
-        this(new SafeHTree<>(recman, PARENT_TO_CHILD_MAP), new SafeHTree<>(recman, CHILD_TO_PARENT_MAP));
+        this(new SafeHTree<>(recman, PARENT_TO_CHILD), new SafeHTree<>(recman, CHILD_TO_PARENT));
     }
 
     private void addChildLink(int parent, int child) {
@@ -61,6 +61,13 @@ public class LinkIndexer {
         }
     }
 
+    /**
+     * Adds links for a given document ID to the index.
+     * If links already exist for the document, they will be removed and replaced
+     * 
+     * @param docId The ID of the document.
+     * @param links The set of links to be added.
+     */
     public void addLinks(int docId, Set<Integer> links) {
         try {
             removeLinks(docId);
@@ -71,6 +78,11 @@ public class LinkIndexer {
         }
     }
 
+    /**
+     * Removes the links associated with the given document ID.
+     *
+     * @param docId the ID of the document whose links are to be removed
+     */
     public void removeLinks(int docId) {
         try {
             // Remove child links

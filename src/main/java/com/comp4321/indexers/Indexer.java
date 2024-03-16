@@ -30,6 +30,12 @@ public class Indexer implements AutoCloseable {
         metadataIndexer = new MetadataIndexer(recman);
     }
 
+    /**
+     * Indexes a document by crawling the given URL, extracting metadata, links, title, and words,
+     * and adding them to the respective indexes.
+     *
+     * @param url the URL of the document to be indexed
+     */
     public void indexDocument(String url) {
         try {
             final var crawler = new Crawler(url);
