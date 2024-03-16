@@ -59,7 +59,9 @@ public class Indexer implements AutoCloseable {
             postingIndex.removeDocument(docId);
 
             // Add the metadata to metadata index
-            metadataIndexer.addMetadata(docId, new Metadata(curLastModified));
+            final var title = String.join(" ", crawler.extractTitle());
+            final var pageSize = crawler.getPageSize();
+            metadataIndexer.addMetadata(docId, new Metadata(title, curLastModified, pageSize));
 
             // Add the links to link index
             final var links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
