@@ -20,6 +20,7 @@ public class Indexer implements AutoCloseable {
     private final MetadataIndexer metadataIndexer;
     private final LinkIndexer linkIndexer;
     private final WordIndexer wordIndexer;
+    private final PostingIndex postingIndex;
 
     private final StopStem stopStem = new StopStem();
     private final Porter porter = new Porter();
@@ -30,6 +31,7 @@ public class Indexer implements AutoCloseable {
         linkIndexer = new LinkIndexer(recman);
         metadataIndexer = new MetadataIndexer(recman);
         wordIndexer = new WordIndexer(recman);
+        postingIndex = new PostingIndex(recman);
     }
 
     /**
@@ -51,6 +53,10 @@ public class Indexer implements AutoCloseable {
             // Skip if the document is already indexed and not modified
             if (metadata != null && !curLastModified.isAfter(metadata.lastModified()))
                 return;
+            
+            // Remove the old postings when the document is modified
+            // Other indexes automatically overwrite the old data
+            postingIndex.removeDocument(docId);
 
             // Add the metadata to metadata index
             metadataIndexer.addMetadata(docId, new Metadata(curLastModified));
@@ -68,7 +74,7 @@ public class Indexer implements AutoCloseable {
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
                     .map(wordIndexer::getOrCreateId)
-                    .count();
+                    .forEach(titleId -> postingIndex.addTitle(docId, titleId));
 
             crawler.extractWords()
                     .stream()
@@ -77,8 +83,7 @@ public class Indexer implements AutoCloseable {
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
                     .map(wordIndexer::getOrCreateId)
-                    .count();
-
+                    .forEach(wordId -> postingIndex.addWord(docId, wordId));
         } catch (ParserException e) {
             e.printStackTrace();
         }
@@ -89,6 +94,7 @@ public class Indexer implements AutoCloseable {
         metadataIndexer.printAll();
         linkIndexer.printAll();
         wordIndexer.printAll();
+        postingIndex.printAll();
     }
 
     @Override
