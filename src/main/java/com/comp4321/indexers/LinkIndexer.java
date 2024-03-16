@@ -6,7 +6,12 @@ import java.util.Set;
 
 import com.comp4321.jdbm.SafeHTree;
 
+import jdbm.RecordManager;
+
 public class LinkIndexer {
+    public static final String PARENT_TO_CHILD_MAP = "parentToChildMap";
+    public static final String CHILD_TO_PARENT_MAP = "childToParentMap";
+
     private final SafeHTree<Integer, Set<Integer>> parentToChildMap;
     private final SafeHTree<Integer, Set<Integer>> childToParentMap;
 
@@ -14,6 +19,10 @@ public class LinkIndexer {
             SafeHTree<Integer, Set<Integer>> childToParentMap) {
         this.parentToChildMap = parentToChildMap;
         this.childToParentMap = childToParentMap;
+    }
+
+    public LinkIndexer(RecordManager recman) throws IOException {
+        this(new SafeHTree<>(recman, PARENT_TO_CHILD_MAP), new SafeHTree<>(recman, CHILD_TO_PARENT_MAP));
     }
 
     private void addChildLink(int parent, int child) {

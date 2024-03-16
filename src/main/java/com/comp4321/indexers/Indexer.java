@@ -1,7 +1,6 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.stream.Collectors;
 
 import org.htmlparser.util.ParserException;
@@ -9,18 +8,12 @@ import org.htmlparser.util.ParserException;
 import com.comp4321.Crawler;
 import com.comp4321.StopStem;
 import com.comp4321.IRUtilities.Porter;
-import com.comp4321.jdbm.SafeBTree;
-import com.comp4321.jdbm.SafeHTree;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
 
 public class Indexer implements AutoCloseable {
     private static final String DB_NAME = "indexes";
-    private static final String URL_MAP = "urlMap";
-    private static final String PARENT_TO_CHILD_MAP = "parentToChildMap";
-    private static final String CHILD_TO_PARENT_MAP = "childToParentMap";
-    private static final String METADATA_MAP = "metadataMap";
 
     private final RecordManager recman;
     private final URLIndexer urlIndexer;
@@ -32,10 +25,9 @@ public class Indexer implements AutoCloseable {
 
     public Indexer() throws IOException {
         recman = RecordManagerFactory.createRecordManager(DB_NAME);
-        urlIndexer = new URLIndexer(new SafeBTree<String, Integer>(recman, URL_MAP, Comparator.naturalOrder()));
-        linkIndexer = new LinkIndexer(new SafeHTree<>(recman, PARENT_TO_CHILD_MAP),
-                new SafeHTree<>(recman, CHILD_TO_PARENT_MAP));
-        metadataIndexer = new MetadataIndexer(new SafeHTree<>(recman, METADATA_MAP));
+        urlIndexer = new URLIndexer(recman);
+        linkIndexer = new LinkIndexer(recman);
+        metadataIndexer = new MetadataIndexer(recman);
     }
 
     public void indexDocument(String url) {

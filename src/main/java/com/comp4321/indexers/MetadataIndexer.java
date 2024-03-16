@@ -4,11 +4,19 @@ import java.io.IOException;
 
 import com.comp4321.jdbm.SafeHTree;
 
+import jdbm.RecordManager;
+
 public class MetadataIndexer {
+    public static final String METADATA_MAP = "metadataMap";
+
     private final SafeHTree<Integer, Metadata> metadataMap;
 
     public MetadataIndexer(SafeHTree<Integer, Metadata> metadataMap) {
         this.metadataMap = metadataMap;
+    }
+
+    public MetadataIndexer(RecordManager recman) throws IOException {
+        this(new SafeHTree<>(recman, METADATA_MAP));
     }
 
     public Metadata getMetadata(int docId) {

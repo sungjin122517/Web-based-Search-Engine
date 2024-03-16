@@ -1,14 +1,22 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.Comparator;
 
 import com.comp4321.jdbm.SafeBTree;
 
+import jdbm.RecordManager;
+
 public class URLIndexer {
+    public static final String URL_MAP = "urlMap";
     private final SafeBTree<String, Integer> urlMap;
 
     public URLIndexer(SafeBTree<String, Integer> urlMap) {
         this.urlMap = urlMap;
+    }
+
+    public URLIndexer(RecordManager recman) throws IOException {
+        this(new SafeBTree<String, Integer>(recman, URL_MAP, Comparator.naturalOrder()));
     }
 
     /**
