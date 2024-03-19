@@ -17,28 +17,60 @@ public class PostingIndex {
     public final static String TITLEID_TO_POSTINGS = "titleIdToPostings";
     public final static String DOCID_TO_WORDSID = "docIdToWordsId";
     public final static String WORDSID_TO_POSTINGS = "wordsIdToPostings";
+    public final static String DOCID_TO_TFMAX = "docIdToTfMax";
 
     // Inverted indexes are maintained in sorted order for efficient search
     private final SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap;
     private final SafeHTree<Integer, List<Posting>> titleIdToPostingsMap;
     private final SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap;
     private final SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap;
+    private final SafeHTree<Integer, Integer> docIdToTFMaxMap;
 
     public PostingIndex(SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap,
             SafeHTree<Integer, List<Posting>> titleIdToPostingsMap,
             SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap,
-            SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap) {
+            SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap,
+            SafeHTree<Integer, Integer> docIdToTFMaxMap) {
         this.titleIdToPostingsMap = titleIdToPostingsMap;
         this.docIdToTitleIdMap = docIdToTitleIdMap;
         this.wordsIdToPostingsMap = wordsIdToPostingsMap;
         this.docIdToWordsIdMap = docIdToWordsIdMap;
+        this.docIdToTFMaxMap = docIdToTFMaxMap;
     }
 
     public PostingIndex(RecordManager recman) throws IOException {
         this(new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_TITLEID),
                 new SafeHTree<Integer, List<Posting>>(recman, TITLEID_TO_POSTINGS),
                 new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_WORDSID),
-                new SafeHTree<Integer, List<Posting>>(recman, WORDSID_TO_POSTINGS));
+                new SafeHTree<Integer, List<Posting>>(recman, WORDSID_TO_POSTINGS),
+                new SafeHTree<Integer, Integer>(recman, DOCID_TO_TFMAX));
+    }
+
+    private void updateTFMax(Integer docId, Integer wordId) throws IOException {
+        // It's more effieicnt to use current frequency information while inserting the
+        // word, but it's simpler to search both indexes every time.
+        final var posting = new Posting(docId, 0);
+
+        var titleCount = 0;
+        final var titlePostings = titleIdToPostingsMap.get(wordId);
+        if (titlePostings != null) {
+            final var titleIdx = Collections.binarySearch(titlePostings, posting, Comparator.comparing(Posting::docId));
+            if (0 <= titleIdx && titleIdx < titlePostings.size())
+                titleCount = titlePostings.get(titleIdx).frequency();
+        }
+
+        var wordCount = 0;
+        final var wordPostings = wordsIdToPostingsMap.get(wordId);
+        if (wordPostings != null) {
+            final var wordIdx = Collections.binarySearch(wordPostings, posting, Comparator.comparing(Posting::docId));
+            if (0 <= wordIdx && wordIdx < wordPostings.size())
+                wordCount = wordPostings.get(wordIdx).frequency();
+        }
+
+        final var tfMax = titleCount + wordCount;
+        final var curTFMax = docIdToTFMaxMap.get(docId);
+        if (curTFMax == null || curTFMax < tfMax)
+            docIdToTFMaxMap.put(docId, tfMax);
     }
 
     private void addWordToIndex(Integer docId, Integer wordId, SafeHTree<Integer, Set<Integer>> forwardIndexMap,
@@ -67,14 +99,18 @@ public class PostingIndex {
             postings.add(-postingIdx - 1, newPosting);
         }
         invertedIndexMap.put(wordId, postings);
+
+        // Update the TFMax
+        updateTFMax(docId, wordId);
     }
 
     /**
      * Adds a title to the posting index for a given document.
      *
-     * @param docId The ID of the document.
+     * @param docId   The ID of the document.
      * @param titleId The ID of the title.
-     * @throws RuntimeException if an error occurs while adding the title to the index.
+     * @throws RuntimeException if an error occurs while adding the title to the
+     *                          index.
      */
     public void addTitle(Integer docId, Integer titleId) {
         try {
@@ -87,9 +123,10 @@ public class PostingIndex {
     /**
      * Adds a word to the posting index for a given document.
      *
-     * @param docId   the ID of the document
-     * @param wordId  the ID of the word
-     * @throws RuntimeException if an error occurs while adding the word to the index
+     * @param docId  the ID of the document
+     * @param wordId the ID of the word
+     * @throws RuntimeException if an error occurs while adding the word to the
+     *                          index
      */
     public void addWord(Integer docId, Integer wordId) {
         try {
@@ -97,6 +134,10 @@ public class PostingIndex {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void removeTFMax(Integer docId) throws IOException {
+        docIdToTFMaxMap.remove(docId);
     }
 
     private void removeDocumentFromIndex(Integer docId, SafeHTree<Integer, Set<Integer>> forwardIndexMap,
@@ -120,6 +161,8 @@ public class PostingIndex {
                 throw new IllegalStateException("Inconsistent index");
             }
         }
+
+        removeTFMax(docId);
     }
 
     /**
@@ -158,6 +201,12 @@ public class PostingIndex {
 
         System.out.println("WORDSID_TO_POSTINGS:");
         for (final var entry : wordsIdToPostingsMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("DOCID_TO_TFMAX:");
+        for (final var entry : docIdToTFMaxMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
         System.out.println();
