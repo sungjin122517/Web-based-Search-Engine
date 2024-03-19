@@ -61,14 +61,6 @@
           <version>3.3.0</version>
         </plugin>
         <plugin>
-          <artifactId>maven-install-plugin</artifactId>
-          <version>3.1.1</version>
-        </plugin>
-        <plugin>
-          <artifactId>maven-deploy-plugin</artifactId>
-          <version>3.1.1</version>
-        </plugin>
-        <plugin>
           <artifactId>maven-project-info-reports-plugin</artifactId>
           <version>3.5.0</version>
         </plugin>
@@ -92,6 +84,14 @@
             </execution>
           </executions>
         </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <version>3.2.0</version>
+          <configuration>
+              <mainClass>com.comp4321.App</mainClass>
+          </configuration>
+      </plugin>
       </plugins>
     </pluginManagement>
   </build>

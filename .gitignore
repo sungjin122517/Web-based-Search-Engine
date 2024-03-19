@@ -43,3 +43,7 @@ buildNumber.properties
 
 # VS Code
 .vscode/
+
+# Project artifacts
+indexes.db
+indexes.lg

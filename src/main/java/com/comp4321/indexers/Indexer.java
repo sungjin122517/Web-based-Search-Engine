@@ -36,8 +36,7 @@ public class Indexer implements AutoCloseable {
 
     /**
      * Indexes a document by crawling the given URL, extracting metadata, links,
-     * title, and words,
-     * and adding them to the respective indexes.
+     * title, and words, and adding them to the respective indexes.
      *
      * @param url the URL of the document to be indexed
      */
@@ -46,7 +45,7 @@ public class Indexer implements AutoCloseable {
             final var crawler = new Crawler(url);
             final var curLastModified = crawler.getLastModified();
 
-            // Add the url to URL_MAP and get the metadata
+            // Add the url and get the metadata
             final var docId = urlIndexer.getOrCreateDocumentId(url);
             final var metadata = metadataIndexer.getMetadata(docId);
 
