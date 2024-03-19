@@ -18,6 +18,7 @@ public class PostingIndex {
     public final static String DOCID_TO_WORDSID = "docIdToWordsId";
     public final static String WORDSID_TO_POSTINGS = "wordsIdToPostings";
     public final static String DOCID_TO_TFMAX = "docIdToTfMax";
+    public final static String WORDID_TO_DF = "wordIdToDf";
 
     // Inverted indexes are maintained in sorted order for efficient search
     private final SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap;
@@ -25,17 +26,20 @@ public class PostingIndex {
     private final SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap;
     private final SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap;
     private final SafeHTree<Integer, Integer> docIdToTFMaxMap;
+    private final SafeHTree<Integer, Integer> wordIdToDfMap;
 
     public PostingIndex(SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap,
             SafeHTree<Integer, List<Posting>> titleIdToPostingsMap,
             SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap,
             SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap,
-            SafeHTree<Integer, Integer> docIdToTFMaxMap) {
+            SafeHTree<Integer, Integer> docIdToTFMaxMap,
+            SafeHTree<Integer, Integer> wordIdToDfMap) {
         this.titleIdToPostingsMap = titleIdToPostingsMap;
         this.docIdToTitleIdMap = docIdToTitleIdMap;
         this.wordsIdToPostingsMap = wordsIdToPostingsMap;
         this.docIdToWordsIdMap = docIdToWordsIdMap;
         this.docIdToTFMaxMap = docIdToTFMaxMap;
+        this.wordIdToDfMap = wordIdToDfMap;
     }
 
     public PostingIndex(RecordManager recman) throws IOException {
@@ -43,12 +47,26 @@ public class PostingIndex {
                 new SafeHTree<Integer, List<Posting>>(recman, TITLEID_TO_POSTINGS),
                 new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_WORDSID),
                 new SafeHTree<Integer, List<Posting>>(recman, WORDSID_TO_POSTINGS),
-                new SafeHTree<Integer, Integer>(recman, DOCID_TO_TFMAX));
+                new SafeHTree<Integer, Integer>(recman, DOCID_TO_TFMAX),
+                new SafeHTree<Integer, Integer>(recman, WORDID_TO_DF));
+    }
+
+    private void updateDF(Integer wordId) throws IOException {
+        final var docIds = new HashSet<Integer>();
+
+        final var titlePostings = titleIdToPostingsMap.get(wordId);
+        if (titlePostings != null)
+            docIds.addAll(titlePostings.stream().map(Posting::docId).toList());
+
+        final var wordPostings = wordsIdToPostingsMap.get(wordId);
+        if (wordPostings != null)
+            docIds.addAll(wordPostings.stream().map(Posting::docId).toList());
+
+        final var df = docIds.size();
+        wordIdToDfMap.put(wordId, df);
     }
 
     private void updateTFMax(Integer docId, Integer wordId) throws IOException {
-        // It's more effieicnt to use current frequency information while inserting the
-        // word, but it's simpler to search both indexes every time.
         final var posting = new Posting(docId, 0);
 
         var titleCount = 0;
@@ -100,8 +118,9 @@ public class PostingIndex {
         }
         invertedIndexMap.put(wordId, postings);
 
-        // Update the TFMax
+        // Update the TFMax and DF
         updateTFMax(docId, wordId);
+        updateDF(wordId);
     }
 
     /**
@@ -160,6 +179,8 @@ public class PostingIndex {
             } else {
                 throw new IllegalStateException("Inconsistent index");
             }
+
+            updateDF(wordId);
         }
 
         removeTFMax(docId);
@@ -207,6 +228,12 @@ public class PostingIndex {
 
         System.out.println("DOCID_TO_TFMAX:");
         for (final var entry : docIdToTFMaxMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("WORDID_TO_DF:");
+        for (final var entry : wordIdToDfMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
         System.out.println();
