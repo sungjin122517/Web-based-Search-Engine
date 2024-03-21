@@ -58,7 +58,7 @@ public class Indexer implements AutoCloseable {
             postingIndex.removeDocument(docId);
 
             // Add the metadata to metadata index
-            final var title = String.join(" ", crawler.extractTitle());
+            final var title = String.join(" ", crawler.extractTitle(false));
             final var pageSize = crawler.getPageSize();
             metadataIndexer.addMetadata(docId, new Metadata(title, curLastModified, pageSize));
 
@@ -68,7 +68,7 @@ public class Indexer implements AutoCloseable {
             linkIndexer.addLinks(docId, links);
 
             // Add title and words to word index
-            crawler.extractTitle()
+            crawler.extractTitle(true)
                     .stream()
                     .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
