@@ -2,6 +2,7 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.htmlparser.util.ParserException;
 
@@ -52,7 +53,7 @@ public class Indexer implements AutoCloseable {
             // Skip if the document is already indexed and not modified
             if (metadata != null && !curLastModified.isAfter(metadata.lastModified()))
                 return;
-            
+
             // Remove the old postings when the document is modified
             // Other indexes automatically overwrite the old data
             postingIndex.removeDocument(docId);
@@ -68,23 +69,26 @@ public class Indexer implements AutoCloseable {
             linkIndexer.addLinks(docId, links);
 
             // Add title and words to word index
-            crawler.extractTitle(true)
+            final var titles = crawler.extractTitle(true)
                     .stream()
                     .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
                     .map(wordIndexer::getOrCreateId)
-                    .forEach(titleId -> postingIndex.addTitle(docId, titleId));
+                    .toList();
+            IntStream.range(0, titles.size()).forEach(i -> postingIndex.addTitle(docId, titles.get(i), i));
 
-            crawler.extractWords()
+            final var words = crawler.extractWords()
                     .stream()
                     .map(String::toLowerCase)
                     .filter(w -> !stopStem.isStopWord(w))
                     .map(porter::stripAffixes)
                     .filter(w -> !w.isBlank())
                     .map(wordIndexer::getOrCreateId)
-                    .forEach(wordId -> postingIndex.addWord(docId, wordId));
+                    .toList();
+            IntStream.range(0, words.size()).forEach(i -> postingIndex.addWord(docId, words.get(i), i));
+
         } catch (ParserException e) {
             e.printStackTrace();
         }

@@ -67,14 +67,14 @@ public class PostingIndex {
     }
 
     private void updateTFMax(Integer docId, Integer wordId) throws IOException {
-        final var posting = new Posting(docId, 0);
+        final var posting = new Posting(docId);
 
         var titleCount = 0;
         final var titlePostings = titleIdToPostingsMap.get(wordId);
         if (titlePostings != null) {
             final var titleIdx = Collections.binarySearch(titlePostings, posting, Comparator.comparing(Posting::docId));
             if (0 <= titleIdx && titleIdx < titlePostings.size())
-                titleCount = titlePostings.get(titleIdx).frequency();
+                titleCount = titlePostings.get(titleIdx).locations().size();
         }
 
         var wordCount = 0;
@@ -82,7 +82,7 @@ public class PostingIndex {
         if (wordPostings != null) {
             final var wordIdx = Collections.binarySearch(wordPostings, posting, Comparator.comparing(Posting::docId));
             if (0 <= wordIdx && wordIdx < wordPostings.size())
-                wordCount = wordPostings.get(wordIdx).frequency();
+                wordCount = wordPostings.get(wordIdx).locations().size();
         }
 
         final var tfMax = titleCount + wordCount;
@@ -91,7 +91,8 @@ public class PostingIndex {
             docIdToTFMaxMap.put(docId, tfMax);
     }
 
-    private void addWordToIndex(Integer docId, Integer wordId, SafeHTree<Integer, Set<Integer>> forwardIndexMap,
+    private void addWordToIndex(Integer docId, Integer wordId, Integer location,
+            SafeHTree<Integer, Set<Integer>> forwardIndexMap,
             SafeHTree<Integer, List<Posting>> invertedIndexMap) throws IOException {
         // Update the forward index
         var forwardIndex = forwardIndexMap.get(docId);
@@ -106,14 +107,16 @@ public class PostingIndex {
             postings = new ArrayList<>();
 
         // Binary search for the posting and add or update it
-        final var postingIdx = Collections.binarySearch(postings, new Posting(docId, 0),
+        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
                 Comparator.comparing(Posting::docId));
         if (0 <= postingIdx && postingIdx < postings.size()) {
             final var curPosting = postings.get(postingIdx);
-            final var newPosting = new Posting(curPosting.docId(), curPosting.frequency() + 1);
+            curPosting.addLocation(location);
+
+            final var newPosting = curPosting.addLocation(location);
             postings.set(postingIdx, newPosting);
         } else {
-            final var newPosting = new Posting(docId, 1);
+            final var newPosting = new Posting(docId, Set.of(location));
             postings.add(-postingIdx - 1, newPosting);
         }
         invertedIndexMap.put(wordId, postings);
@@ -126,14 +129,15 @@ public class PostingIndex {
     /**
      * Adds a title to the posting index for a given document.
      *
-     * @param docId   The ID of the document.
-     * @param titleId The ID of the title.
+     * @param docId    The ID of the document
+     * @param titleId  The ID of the title
+     * @param location The location of the title
      * @throws RuntimeException if an error occurs while adding the title to the
      *                          index.
      */
-    public void addTitle(Integer docId, Integer titleId) {
+    public void addTitle(Integer docId, Integer titleId, Integer location) {
         try {
-            addWordToIndex(docId, titleId, docIdToTitleIdMap, titleIdToPostingsMap);
+            addWordToIndex(docId, titleId, location, docIdToTitleIdMap, titleIdToPostingsMap);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -142,21 +146,18 @@ public class PostingIndex {
     /**
      * Adds a word to the posting index for a given document.
      *
-     * @param docId  the ID of the document
-     * @param wordId the ID of the word
+     * @param docId    the ID of the document
+     * @param wordId   the ID of the word
+     * @param location the location of the word
      * @throws RuntimeException if an error occurs while adding the word to the
      *                          index
      */
-    public void addWord(Integer docId, Integer wordId) {
+    public void addWord(Integer docId, Integer wordId, Integer location) {
         try {
-            addWordToIndex(docId, wordId, docIdToWordsIdMap, wordsIdToPostingsMap);
+            addWordToIndex(docId, wordId, location, docIdToWordsIdMap, wordsIdToPostingsMap);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private void removeTFMax(Integer docId) throws IOException {
-        docIdToTFMaxMap.remove(docId);
     }
 
     private void removeDocumentFromIndex(Integer docId, SafeHTree<Integer, Set<Integer>> forwardIndexMap,
@@ -165,13 +166,14 @@ public class PostingIndex {
         if (forwardIndex == null)
             return;
         forwardIndexMap.remove(docId);
+        docIdToTFMaxMap.remove(docId);
 
         for (final var wordId : forwardIndex) {
             final var postings = invertedIndexMap.get(wordId);
             if (postings == null)
                 throw new IllegalStateException("Inconsistent index");
 
-            final var postingIdx = Collections.binarySearch(postings, new Posting(docId, 0),
+            final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
                     Comparator.comparing(Posting::docId));
             if (0 <= postingIdx && postingIdx < postings.size()) {
                 postings.remove(postingIdx);
@@ -182,8 +184,6 @@ public class PostingIndex {
 
             updateDF(wordId);
         }
-
-        removeTFMax(docId);
     }
 
     /**
