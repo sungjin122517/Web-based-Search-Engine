@@ -238,4 +238,26 @@ public class PostingIndex {
         }
         System.out.println();
     }
+
+    // method to get list of words id for a given docId
+    public Set<Integer> getWordsId(Integer docId) {
+        try {
+            return docIdToWordsIdMap.get(docId);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // given a wordId and docId, return the frequency of the word in the document
+    public int getWordFrequency(Integer wordId, Integer docId) {
+        try {
+            final var wordPostings = wordsIdToPostingsMap.get(wordId);
+            final var wordIdx = Collections.binarySearch(wordPostings, new Posting(docId), Comparator.comparing(Posting::docId));
+            final var wordCount = (0 <= wordIdx && wordIdx < wordPostings.size()) ? wordPostings.get(wordIdx).locations().size() : 0;
+
+            return wordCount;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

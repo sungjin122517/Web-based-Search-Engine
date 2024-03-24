@@ -1,5 +1,6 @@
 package com.comp4321.indexers;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -100,6 +101,54 @@ public class Indexer implements AutoCloseable {
         linkIndexer.printAll();
         wordIndexer.printAll();
         postingIndex.printAll();
+    }
+
+    // method to output a plain-text file named spider_result.txt
+    public void outputSpiderResult(String filename) throws IOException {
+        var metadataMap = metadataIndexer.getMetadataMap();
+
+        // create string with page title /n url /n last modification date, size of page /n list of keyword: frequency /n child links
+        var content = new StringBuilder();
+        for (final var entry : metadataMap) {
+            var docId = entry.getKey();
+            var metadata = entry.getValue();
+            var title = metadata.title();
+            var lastModified = metadata.lastModified();
+            var pageSize = metadata.pageSize();
+            var wordsId = postingIndex.getWordsId(docId);
+            var linksId = linkIndexer.getChildLinksId(docId);
+
+            content.append(title).append("\n");
+            content.append(urlIndexer.getURL(docId)).append("\n");
+            content.append(lastModified).append(", ").append(pageSize).append("\n");
+
+            int count = 0;
+            for (var wordId : wordsId) {
+                var word = wordIndexer.getWord(wordId);
+                var frequency = postingIndex.getWordFrequency(wordId, docId);
+                content.append(word).append(" ").append(frequency).append("; ");
+                if (++count >= 10)
+                    break;
+            }
+            content.append("\n");
+
+            count = 0;
+            for (var linkId : linksId) {
+                var childUrl = urlIndexer.getURL(linkId);
+                content.append(childUrl).append("\n");
+                if (++count >= 10)
+                    break;
+            }
+            content.append("--------------------").append("\n");
+        }
+
+        // create file, write content to file, and save file in the root directory of this project
+        var file = new File(filename);
+        var writer = new java.io.FileWriter(file);
+        writer.write(content.toString());
+        writer.close();
+
+        System.out.println("Output spider result to spider_result.txt");
     }
 
     @Override
