@@ -42,7 +42,7 @@ public class Crawler {
         return Arrays.asList(sb.getStrings().split("[\\W_]+"));
     }
 
-    public List<String> extractTitle() throws ParserException {
+    public List<String> extractTitle(boolean tokenize) throws ParserException {
         final var parser = new Parser();
         parser.setURL(url);
         final var titles = parser.parse(node -> {
@@ -57,8 +57,12 @@ public class Crawler {
         for (final var title : titles)
             title.accept(sb);
 
-        // Split by non-alphanumeric characters
-        return Arrays.asList(sb.getStrings().split("[\\W_]+"));
+        if (tokenize)
+            // Split by non-alphanumeric characters
+            return Arrays.asList(sb.getStrings().split("[\\W_]+"));
+        else
+            // Split by space
+            return Arrays.asList(sb.getStrings().split(" "));
     }
 
     public List<String> extractLinks() throws ParserException {
