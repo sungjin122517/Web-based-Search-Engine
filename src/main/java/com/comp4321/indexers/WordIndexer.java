@@ -42,6 +42,7 @@ public class WordIndexer {
 
             final var id = wordToIdMap.size() + 1;
             wordToIdMap.insert(word, id);
+            idToWordMap.insert(id, word);
             return id;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -66,6 +67,12 @@ public class WordIndexer {
     public void printAll() throws IOException {
         System.out.println("WORD_TO_ID:");
         for (final var entry : wordToIdMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("ID_TO_WORD:");
+        for (final var entry : idToWordMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
         System.out.println();
