@@ -44,6 +44,7 @@ public class URLIndexer {
 
             final var docId = urlToDocIdMap.size() + 1;
             urlToDocIdMap.insert(url, docId);
+            docIdToUrlMap.insert(docId, url);
             return docId;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -73,6 +74,11 @@ public class URLIndexer {
         System.out.println("URL_TO_DOCID:");
         for (final var urlTuple : urlToDocIdMap)
             System.out.println(urlTuple.getKey() + " -> " + urlTuple.getValue());
+        System.out.println();
+
+        System.out.println("DOCID_TO_URL:");
+        for (final var docIdTuple : docIdToUrlMap)
+            System.out.println(docIdTuple.getKey() + " -> " + docIdTuple.getValue());
         System.out.println();
     }
 }
