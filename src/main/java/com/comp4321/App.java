@@ -15,10 +15,10 @@ public class App {
             final var crawler = new Crawler(baseURL);
             crawler.bfs(maxPages, indexer::indexDocument);
             indexer.printAll();
-
+            indexer.outputSpiderResult();
         } catch (ParserException | IOException e) {
             e.printStackTrace();
         }
-
+        
     }
 }

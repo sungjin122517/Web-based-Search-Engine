@@ -72,4 +72,9 @@ public class MetadataIndexer {
         }
         System.out.println();
     }
+
+    // method to return metadataMap
+    public SafeHTree<Integer, Metadata> getMetadataMap() {
+        return metadataMap;
+    }
 }

@@ -110,4 +110,13 @@ public class LinkIndexer {
         }
         System.out.println();
     }
+
+    // method to get list of child id for a given docId
+    public Set<Integer> getChildLinksId(int docId) {
+        try {
+            return parentToChildMap.get(docId);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }
