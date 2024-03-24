@@ -251,15 +251,11 @@ public class PostingIndex {
     // given a wordId and docId, return the frequency of the word in the document
     public int getWordFrequency(Integer wordId, Integer docId) {
         try {
-            final var postings = wordsIdToPostingsMap.get(wordId);
-            if (postings == null)
-                return 0;
+            final var wordPostings = wordsIdToPostingsMap.get(wordId);
+            final var wordIdx = Collections.binarySearch(wordPostings, new Posting(docId), Comparator.comparing(Posting::docId));
+            final var wordCount = (0 <= wordIdx && wordIdx < wordPostings.size()) ? wordPostings.get(wordIdx).locations().size() : 0;
 
-            final var postingIdx = Collections.binarySearch(postings, new Posting(docId, 0),
-                    Comparator.comparing(Posting::docId));
-            if (0 <= postingIdx && postingIdx < postings.size())
-                return postings.get(postingIdx).frequency();
-            return 0;
+            return wordCount;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
