@@ -104,7 +104,7 @@ public class Indexer implements AutoCloseable {
     }
 
     // method to output a plain-text file named spider_result.txt
-    public void outputSpiderResult() throws IOException {
+    public void outputSpiderResult(String filename) throws IOException {
         var metadataMap = metadataIndexer.getMetadataMap();
 
         // create string with page title /n url /n last modification date, size of page /n list of keyword: frequency /n child links
@@ -143,7 +143,7 @@ public class Indexer implements AutoCloseable {
         }
 
         // create file, write content to file, and save file in the root directory of this project
-        var file = new File("spider_result.txt");
+        var file = new File(filename);
         var writer = new java.io.FileWriter(file);
         writer.write(content.toString());
         writer.close();
