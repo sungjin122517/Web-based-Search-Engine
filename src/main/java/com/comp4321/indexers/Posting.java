@@ -11,7 +11,7 @@ public record Posting(Integer docId, Set<Integer> locations) implements Serializ
         Objects.requireNonNull(docId);
         Objects.requireNonNull(locations);
         if (docId < 0)
-            throw new IllegalArgumentException("docId and frequency must be non-negative");
+            throw new IllegalArgumentException("docId must be non-negative");
     }
 
     /**
@@ -24,6 +24,12 @@ public record Posting(Integer docId, Set<Integer> locations) implements Serializ
         this(docId, Set.of());
     }
 
+    /**
+     * Returns a copy of the Posting object with the given location added.
+     *
+     * @param location the location to add
+     * @return a new Posting object with the added location
+     */
     public Posting addLocation(Integer location) {
         final var newLocations = new TreeSet<>(locations);
         newLocations.add(location);

@@ -4,11 +4,8 @@ import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.function.Consumer;
 
 import org.htmlparser.Parser;
 import org.htmlparser.Tag;
@@ -95,30 +92,5 @@ public class Crawler {
         if (pageSize == -1)
             pageSize = parser.parse(null).toHtml(true).length();
         return pageSize;
-    }
-
-    public void bfs(int maxPages, Consumer<String> indexer) throws ParserException {
-        final var queue = new ArrayDeque<String>();
-        final var visited = new HashSet<String>();
-
-        queue.add(url);
-        visited.add(url);
-        indexer.accept(url);
-
-        final var lb = new LinkBean();
-        while (!queue.isEmpty() && visited.size() < maxPages) {
-            final var curURL = queue.remove();
-            lb.setURL(curURL);
-
-            Arrays.stream(lb.getLinks())
-                    .map(URL::toString)
-                    .forEach(link -> {
-                        if (!visited.contains(link) && visited.size() < maxPages) {
-                            queue.add(link);
-                            visited.add(link);
-                            indexer.accept(link);
-                        }
-                    });
-        }
     }
 }

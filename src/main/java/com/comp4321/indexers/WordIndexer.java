@@ -32,7 +32,7 @@ public class WordIndexer {
      *
      * @param word the word to retrieve the ID for
      * @return the ID associated with the word
-     * @throws RuntimeException if an error occurs while accessing the wordToIdMap
+     * @throws IndexerException if an error occurs while accessing the wordToIdMap
      */
     public Integer getOrCreateId(String word) {
         try {
@@ -45,7 +45,7 @@ public class WordIndexer {
             idToWordMap.insert(id, word);
             return id;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(word, e);
         }
     }
 
@@ -54,13 +54,13 @@ public class WordIndexer {
      *
      * @param id The ID of the word to retrieve.
      * @return The word associated with the given ID.
-     * @throws RuntimeException If an error occurs while retrieving the word.
+     * @throws IndexerException If an error occurs while retrieving the word.
      */
     public String getWord(Integer id) {
         try {
             return idToWordMap.find(id);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("WordId: %d", id), e);
         }
     }
 

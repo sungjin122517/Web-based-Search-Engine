@@ -39,7 +39,7 @@ public class LinkIndexer {
             parentsValue.add(parent);
             childToParentMap.put(childKey, parentsValue);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("Parent: %d Child %d", parent, child), e);
         }
     }
 
@@ -57,7 +57,7 @@ public class LinkIndexer {
             parentsValue.remove(parent);
             childToParentMap.put(childKey, parentsValue);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("Parent: %d Child %d", parent, child), e);
         }
     }
 
@@ -74,7 +74,7 @@ public class LinkIndexer {
             parentToChildMap.put(Integer.valueOf(docId), links);
             links.stream().forEach(child -> addChildLink(docId, child));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -93,7 +93,7 @@ public class LinkIndexer {
             // Remove parent link
             parentToChildMap.remove(Integer.valueOf(docId));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId %d", docId), e);
         }
     }
 
@@ -111,12 +111,11 @@ public class LinkIndexer {
         System.out.println();
     }
 
-    // method to get list of child id for a given docId
     public Set<Integer> getChildLinksId(int docId) {
         try {
             return parentToChildMap.get(docId);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 }

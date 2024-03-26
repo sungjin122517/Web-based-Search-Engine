@@ -33,7 +33,7 @@ public class URLIndexer {
      *
      * @param url The URL for which to retrieve or create a document ID.
      * @return The document ID associated with the URL.
-     * @throws RuntimeException If an error occurs while retrieving or creating the
+     * @throws IndexerException If an error occurs while retrieving or creating the
      *                          document ID.
      */
     public Integer getOrCreateDocumentId(String url) {
@@ -47,7 +47,7 @@ public class URLIndexer {
             docIdToUrlMap.insert(docId, url);
             return docId;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(url, e);
         }
     }
 
@@ -57,7 +57,7 @@ public class URLIndexer {
      * @param docId The document ID for which to retrieve the URL.
      * @return The URL associated with the given document ID.
      * @throws NoSuchElementException If the document ID is not found in the index.
-     * @throws RuntimeException       If an error occurs while retrieving the URL.
+     * @throws IndexerException       If an error occurs while retrieving the URL.
      */
     public String getURL(Integer docId) {
         try {
@@ -66,7 +66,7 @@ public class URLIndexer {
                 throw new NoSuchElementException();
             return url;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
