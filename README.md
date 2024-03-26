@@ -10,12 +10,12 @@ mvn clean package
 This will create an uber-jar in the `target` directory named `course_project-1.0-SNAPSHOT.jar`.
 
 # How to Execute
-Run the following command to execute the project:
+Run the following command to generate spider_result.txt:
 ```shell
-java -jar target/course_project-1.0-SNAPSHOT.jar
+java -jar target/course_project-1.0-SNAPSHOT.jar spider_result
 ```
 
-To execute the project without building it, run the following command:
+Run the following command to crawl pages:
 ```shell
-mvn exec:java
+java -jar target/course_project-1.0-SNAPSHOT.jar crawl
 ```
