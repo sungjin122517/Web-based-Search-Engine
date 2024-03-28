@@ -4,9 +4,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.comp4321.jdbm.SafeHTree;
 
@@ -239,7 +244,6 @@ public class PostingIndex {
         System.out.println();
     }
 
-    // method to get list of words id for a given docId
     public Set<Integer> getWordsId(Integer docId) {
         try {
             return docIdToWordsIdMap.get(docId);
@@ -248,7 +252,6 @@ public class PostingIndex {
         }
     }
 
-    // given a wordId and docId, return the frequency of the word in the document
     public int getWordFrequency(Integer docId, Integer wordId) {
         try {
             final var wordPostings = wordsIdToPostingsMap.get(wordId);
@@ -261,6 +264,50 @@ public class PostingIndex {
             return wordCount;
         } catch (IOException e) {
             throw new IndexerException(String.format("DocId: %d", docId), e);
+        }
+    }
+
+    private Map<Integer, Double> getScoresForIndex(Set<Integer> wordIds,
+            SafeHTree<Integer, List<Posting>> invertedIndexMap, Integer indexSize)
+            throws IOException {
+        final var scores = new HashMap<Integer, Double>();
+
+        for (final var wordId : wordIds) {
+            final var df = wordIdToDfMap.get(wordId);
+            final var idf = Math.log((double) indexSize / df);
+
+            final var postings = invertedIndexMap.get(wordId);
+            for (final var posting : postings) {
+                final var docId = posting.docId();
+                final var tf = posting.locations().size();
+                final var tfMax = docIdToTFMaxMap.get(docId);
+
+                final var score = tf * idf / tfMax;
+                scores.merge(docId, score, Double::sum);
+            }
+        }
+
+        return scores;
+    }
+
+    /**
+     * Calculates the scores for a given set of word IDs. Currently, match in title
+     * and body are considered equally important.
+     *
+     * @param wordIds   the set of word IDs for which scores need to be calculated
+     * @param indexSize the total number of documents in the index
+     * @return a map of document IDs to their corresponding scores
+     * @throws IndexerException if an error occurs while calculating the scores
+     */
+    public Map<Integer, Double> getScores(Set<Integer> wordIds, Integer indexSize) {
+        try {
+            final var titleScores = getScoresForIndex(wordIds, titleIdToPostingsMap, indexSize);
+            final var bodyScores = getScoresForIndex(wordIds, wordsIdToPostingsMap, indexSize);
+
+            return Stream.of(titleScores, bodyScores).flatMap(m -> m.entrySet().stream())
+                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue, Double::sum));
+        } catch (IOException e) {
+            throw new IndexerException("Error while calculating scores", e);
         }
     }
 }
