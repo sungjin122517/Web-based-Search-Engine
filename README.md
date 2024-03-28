@@ -1,6 +1,6 @@
 # Requirements
-- JDK 21 or higher
-- Apache Maven 3.9.6 or higher
+- JDK 21
+- Apache Maven 3.9.6
 
 # How to Build
 Run the following command to build the project:
