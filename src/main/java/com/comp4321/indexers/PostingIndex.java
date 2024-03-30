@@ -206,62 +206,53 @@ public class PostingIndex {
         }
     }
 
-    public void printAll() throws IOException {
-        System.out.println("DOCID_TO_TITLEID:");
-        for (final var entry : docIdToTitleIdMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-
-        System.out.println("TITLEID_TO_POSTINGS:");
-        for (final var entry : titleIdToPostingsMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-
-        System.out.println("DOCID_TO_WORDSID:");
-        for (final var entry : docIdToWordsIdMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-
-        System.out.println("WORDSID_TO_POSTINGS:");
-        for (final var entry : wordsIdToPostingsMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-
-        System.out.println("DOCID_TO_TFMAX:");
-        for (final var entry : docIdToTFMaxMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-
-        System.out.println("WORDID_TO_DF:");
-        for (final var entry : wordIdToDfMap) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
-        System.out.println();
-    }
-
-    public Set<Integer> getWordsId(Integer docId) {
+    /**
+     * Retrieves a set of all word IDs associated with a given document ID.
+     *
+     * @param docId The document ID for which to retrieve the word IDs.
+     * @return A set of all word IDs associated with the given document ID.
+     * @throws IndexerException If an error occurs while retrieving the word IDs.
+     */
+    public Set<Integer> getTotalWordsId(Integer docId) {
         try {
-            return docIdToWordsIdMap.get(docId);
+            final var title = docIdToTitleIdMap.get(docId);
+            final var body = docIdToWordsIdMap.get(docId);
+            title.addAll(body);
+            return title;
         } catch (IOException e) {
             throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
-    public int getWordFrequency(Integer docId, Integer wordId) {
-        try {
-            final var wordPostings = wordsIdToPostingsMap.get(wordId);
-            final var wordIdx = Collections.binarySearch(wordPostings, new Posting(docId),
-                    Comparator.comparing(Posting::docId));
-            final var wordCount = (0 <= wordIdx && wordIdx < wordPostings.size())
-                    ? wordPostings.get(wordIdx).locations().size()
-                    : 0;
+    private int getWordFrequencyForIndex(Integer docId, Integer wordId,
+            SafeHTree<Integer, List<Posting>> invertedIndexMap)
+            throws IOException {
+        final var postings = invertedIndexMap.get(wordId);
+        if (postings == null)
+            return 0;
 
-            return wordCount;
+        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
+                Comparator.comparing(Posting::docId));
+        if (postingIdx < 0)
+            return 0;
+
+        return postings.get(postingIdx).locations().size();
+    }
+
+    /**
+     * Returns the total frequency of a word in a document.
+     *
+     * @param docId  the ID of the document
+     * @param wordId the ID of the word
+     * @return the total frequency of the word in the document
+     * @throws IndexerException if an error occurs while accessing the index
+     */
+    public int getTotalWordFrequency(Integer docId, Integer wordId) {
+        try {
+            final var titleCount = getWordFrequencyForIndex(docId, wordId, titleIdToPostingsMap);
+            final var wordCount = getWordFrequencyForIndex(docId, wordId, wordsIdToPostingsMap);
+
+            return titleCount + wordCount;
         } catch (IOException e) {
             throw new IndexerException(String.format("DocId: %d", docId), e);
         }
@@ -301,13 +292,57 @@ public class PostingIndex {
      */
     public Map<Integer, Double> getScores(Set<Integer> wordIds, Integer indexSize) {
         try {
+            // Individual scores for title and body
             final var titleScores = getScoresForIndex(wordIds, titleIdToPostingsMap, indexSize);
             final var bodyScores = getScoresForIndex(wordIds, wordsIdToPostingsMap, indexSize);
 
-            return Stream.of(titleScores, bodyScores).flatMap(m -> m.entrySet().stream())
+            // Combine the scores
+            final var totalScores = Stream.of(titleScores, bodyScores).flatMap(m -> m.entrySet().stream())
                     .collect(Collectors.toMap(Entry::getKey, Entry::getValue, Double::sum));
+
+            // TODO: Normalize the scores to cosine similarity
+            return totalScores;
+
         } catch (IOException e) {
             throw new IndexerException("Error while calculating scores", e);
         }
+    }
+
+    public void printAll() throws IOException {
+        System.out.println("DOCID_TO_TITLEID:");
+        for (final var entry : docIdToTitleIdMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("TITLEID_TO_POSTINGS:");
+        for (final var entry : titleIdToPostingsMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("DOCID_TO_WORDSID:");
+        for (final var entry : docIdToWordsIdMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("WORDSID_TO_POSTINGS:");
+        for (final var entry : wordsIdToPostingsMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("DOCID_TO_TFMAX:");
+        for (final var entry : docIdToTFMaxMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("WORDID_TO_DF:");
+        for (final var entry : wordIdToDfMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
     }
 }

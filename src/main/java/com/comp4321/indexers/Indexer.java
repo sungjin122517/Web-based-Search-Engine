@@ -44,7 +44,7 @@ public class Indexer implements AutoCloseable {
         postingIndex = new PostingIndex(recman);
     }
 
-    public boolean isFreshDocument(String url) {
+    private boolean isFreshDocument(String url) {
         try {
             final var crawler = new Crawler(url);
             final var curLastModified = crawler.getLastModified();
@@ -114,6 +114,13 @@ public class Indexer implements AutoCloseable {
         }
     }
 
+    /**
+     * Performs a breadth-first search starting from the specified base URL and
+     * visits a maximum number of pages.
+     * 
+     * @param baseURL  The base URL to start the search from.
+     * @param maxPages The maximum number of pages to visit.
+     */
     public void bfs(String baseURL, int maxPages) {
         final var queue = new ArrayDeque<String>();
         final var visited = new HashSet<String>();
@@ -143,6 +150,11 @@ public class Indexer implements AutoCloseable {
         }
     }
 
+    /**
+     * Prints all the indexes.
+     *
+     * @throws IOException if an I/O error occurs.
+     */
     public void printAll() throws IOException {
         urlIndexer.printAll();
         metadataIndexer.printAll();
@@ -151,6 +163,12 @@ public class Indexer implements AutoCloseable {
         postingIndex.printAll();
     }
 
+    /**
+     * Outputs the spider result to a file.
+     *
+     * @param filename the name of the file to write the spider result to
+     * @throws IOException if an I/O error occurs while writing the file
+     */
     public void outputSpiderResult(String filename) throws IOException {
         /*
          * page title
@@ -176,9 +194,9 @@ public class Indexer implements AutoCloseable {
             content.append(urlIndexer.getURL(docId)).append("\n");
             content.append(lastModified).append(", ").append(pageSize).append("\n");
 
-            postingIndex.getWordsId(docId).stream().limit(10).forEach(wordId -> {
+            postingIndex.getTotalWordsId(docId).stream().limit(10).forEach(wordId -> {
                 final var word = wordIndexer.getWord(wordId);
-                final var frequency = postingIndex.getWordFrequency(docId, wordId);
+                final var frequency = postingIndex.getTotalWordFrequency(docId, wordId);
                 content.append(word).append(" ").append(frequency).append("; ");
             });
             content.append("\n");

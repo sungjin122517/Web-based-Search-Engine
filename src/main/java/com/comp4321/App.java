@@ -24,6 +24,10 @@ public class App {
                     indexer.outputSpiderResult("spider_result.txt");
                     break;
 
+                case "print":
+                    indexer.printAll();
+                    break;
+
                 default:
                     System.out.println("Unknown argument. Use 'crawl' or 'spider_result'");
                     System.exit(1);
