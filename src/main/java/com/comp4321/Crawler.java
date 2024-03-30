@@ -84,13 +84,14 @@ public class Crawler {
     }
 
     public long getPageSize() throws ParserException {
-        final var parser = new Parser();
-        parser.setURL(url);
+        final var sb = new StringBean();
+        sb.setURL(url);
 
-        // If the page does not have "Content-Length" header, use the page size
-        var pageSize = parser.getConnection().getContentLengthLong();
+        // If the page does not have "Content-Length" header, use the page content size
+        var pageSize = sb.getConnection().getContentLengthLong();
         if (pageSize == -1)
-            pageSize = parser.parse(null).toHtml(true).length();
+            pageSize = sb.getStrings().length();
+
         return pageSize;
     }
 }
