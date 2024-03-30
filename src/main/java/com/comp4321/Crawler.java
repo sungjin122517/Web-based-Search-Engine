@@ -36,7 +36,7 @@ public class Crawler {
             b.accept(sb);
 
         // Split by non-alphanumeric characters
-        return Arrays.asList(sb.getStrings().split("[\\W_]+"));
+        return Arrays.asList(sb.getStrings().split("[^a-zA-Z0-9_-]+"));
     }
 
     public List<String> extractTitle(boolean tokenize) throws ParserException {
@@ -56,7 +56,7 @@ public class Crawler {
 
         if (tokenize)
             // Split by non-alphanumeric characters
-            return Arrays.asList(sb.getStrings().split("[\\W_]+"));
+            return Arrays.asList(sb.getStrings().split("[^a-zA-Z0-9_-]+"));
         else
             // Split by space
             return Arrays.asList(sb.getStrings().split(" "));
