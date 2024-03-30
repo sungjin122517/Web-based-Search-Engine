@@ -1,12 +1,14 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map.Entry;
 
 import com.comp4321.jdbm.SafeHTree;
 
 import jdbm.RecordManager;
 
-public class MetadataIndexer {
+public class MetadataIndexer implements Iterable<Entry<Integer, Metadata>> {
     public static final String DOCID_TO_METADATA = "docIdToMetadata";
 
     private final SafeHTree<Integer, Metadata> metadataMap;
@@ -24,13 +26,13 @@ public class MetadataIndexer {
      * 
      * @param docId The document ID.
      * @return The metadata for the document, or null if no metadata exists.
-     * @throws RuntimeException if an error occurs while getting the metadata.
+     * @throws IndexerException if an error occurs while getting the metadata.
      */
     public Metadata getMetadata(int docId) {
         try {
             return (Metadata) metadataMap.get(docId);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -41,13 +43,13 @@ public class MetadataIndexer {
      *
      * @param docId    The document ID.
      * @param metadata The metadata to be added.
-     * @throws RuntimeException if an error occurs while adding the metadata.
+     * @throws IndexerException if an error occurs while adding the metadata.
      */
     public void addMetadata(int docId, Metadata metadata) {
         try {
             metadataMap.put(docId, metadata);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -55,13 +57,13 @@ public class MetadataIndexer {
      * Removes the metadata associated with the given document ID.
      *
      * @param docId the ID of the document whose metadata needs to be removed
-     * @throws RuntimeException if an IOException occurs while removing the metadata
+     * @throws IndexerException if an IOException occurs while removing the metadata
      */
     public void removeMetadata(int docId) {
         try {
             metadataMap.remove(docId);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -73,8 +75,8 @@ public class MetadataIndexer {
         System.out.println();
     }
 
-    // method to return metadataMap
-    public SafeHTree<Integer, Metadata> getMetadataMap() {
-        return metadataMap;
+    @Override
+    public Iterator<Entry<Integer, Metadata>> iterator() {
+        return metadataMap.iterator();
     }
 }

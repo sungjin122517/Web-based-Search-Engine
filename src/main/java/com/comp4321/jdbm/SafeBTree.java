@@ -1,13 +1,11 @@
 package com.comp4321.jdbm;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Queue;
 
 import jdbm.RecordManager;
 import jdbm.btree.BTree;
@@ -50,21 +48,17 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
         try {
             return new Iterator<Entry<K, V>>() {
                 private final TupleBrowser browser = btree.browse();
-                private final Queue<Tuple> tuples = new ArrayDeque<>();
                 private final Tuple curTuple = new Tuple();
+                private Boolean cachedHasNext = null;
 
                 @Override
                 public boolean hasNext() {
                     try {
-                        if (!tuples.isEmpty())
-                            return true;
+                        if (cachedHasNext != null)
+                            return cachedHasNext;
 
-                        final var hasNext = browser.getNext(curTuple);
-                        if (!hasNext)
-                            return false;
-
-                        tuples.add(new Tuple(curTuple.getKey(), curTuple.getValue()));
-                        return true;
+                        cachedHasNext = browser.getNext(curTuple);
+                        return cachedHasNext;
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -74,13 +68,13 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
                 public Entry<K, V> next() {
                     if (!hasNext())
                         throw new NoSuchElementException();
+                    cachedHasNext = null;
 
-                    final var nextTuple = tuples.remove();
                     return new Entry<>() {
                         @SuppressWarnings("unchecked")
-                        private final K key = (K) nextTuple.getKey();
+                        private final K key = (K) curTuple.getKey();
                         @SuppressWarnings("unchecked")
-                        private final V value = (V) nextTuple.getValue();
+                        private final V value = (V) curTuple.getValue();
 
                         @Override
                         public K getKey() {

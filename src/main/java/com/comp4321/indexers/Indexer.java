@@ -1,10 +1,18 @@
 package com.comp4321.indexers;
 
-import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayDeque;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.Crawler;
@@ -36,6 +44,20 @@ public class Indexer implements AutoCloseable {
         postingIndex = new PostingIndex(recman);
     }
 
+    private boolean isFreshDocument(String url) {
+        try {
+            final var crawler = new Crawler(url);
+            final var curLastModified = crawler.getLastModified();
+
+            final var docId = urlIndexer.getOrCreateDocumentId(url);
+            final var metadata = metadataIndexer.getMetadata(docId);
+
+            return metadata == null || curLastModified.isAfter(metadata.lastModified());
+        } catch (ParserException e) {
+            throw new IndexerException(url, e);
+        }
+    }
+
     /**
      * Indexes a document by crawling the given URL, extracting metadata, links,
      * title, and words, and adding them to the respective indexes.
@@ -47,12 +69,9 @@ public class Indexer implements AutoCloseable {
             final var crawler = new Crawler(url);
             final var curLastModified = crawler.getLastModified();
 
-            // Add the url and get the metadata
-            final var docId = urlIndexer.getOrCreateDocumentId(url);
-            final var metadata = metadataIndexer.getMetadata(docId);
-
             // Skip if the document is already indexed and not modified
-            if (metadata != null && !curLastModified.isAfter(metadata.lastModified()))
+            final var docId = urlIndexer.getOrCreateDocumentId(url);
+            if (!isFreshDocument(url))
                 return;
 
             // Remove the old postings when the document is modified
@@ -91,10 +110,51 @@ public class Indexer implements AutoCloseable {
             IntStream.range(0, words.size()).forEach(i -> postingIndex.addWord(docId, words.get(i), i));
 
         } catch (ParserException e) {
-            e.printStackTrace();
+            throw new IndexerException(url, e);
         }
     }
 
+    /**
+     * Performs a breadth-first search starting from the specified base URL and
+     * visits a maximum number of pages.
+     * 
+     * @param baseURL  The base URL to start the search from.
+     * @param maxPages The maximum number of pages to visit.
+     */
+    public void bfs(String baseURL, int maxPages) {
+        final var queue = new ArrayDeque<String>();
+        final var visited = new HashSet<String>();
+
+        visited.add(baseURL);
+        if (isFreshDocument(baseURL)) {
+            queue.add(baseURL);
+            indexDocument(baseURL);
+        }
+
+        final var lb = new LinkBean();
+        while (!queue.isEmpty() && visited.size() < maxPages) {
+            final var curURL = queue.remove();
+            lb.setURL(curURL);
+
+            Arrays.stream(lb.getLinks())
+                    .map(URL::toString)
+                    .forEach(link -> {
+                        if (!visited.contains(link) && visited.size() < maxPages) {
+                            visited.add(link);
+                            if (isFreshDocument(link)) {
+                                queue.add(link);
+                                indexDocument(link);
+                            }
+                        }
+                    });
+        }
+    }
+
+    /**
+     * Prints all the indexes.
+     *
+     * @throws IOException if an I/O error occurs.
+     */
     public void printAll() throws IOException {
         urlIndexer.printAll();
         metadataIndexer.printAll();
@@ -103,52 +163,56 @@ public class Indexer implements AutoCloseable {
         postingIndex.printAll();
     }
 
-    // method to output a plain-text file named spider_result.txt
+    /**
+     * Outputs the spider result to a file.
+     *
+     * @param filename the name of the file to write the spider result to
+     * @throws IOException if an I/O error occurs while writing the file
+     */
     public void outputSpiderResult(String filename) throws IOException {
-        var metadataMap = metadataIndexer.getMetadataMap();
+        /*
+         * page title
+         * url
+         * last modification date, size of page
+         * keyword 1 frequency 1; keyword 2 frequency 2; ...; keyword 10 frequency 10
+         * child link 1
+         * child link 2
+         * ...
+         * child link 10
+         * --------------------
+         */
+        final var content = new StringBuilder();
+        for (final var entry : metadataIndexer) {
+            final var docId = entry.getKey();
 
-        // create string with page title /n url /n last modification date, size of page /n list of keyword: frequency /n child links
-        var content = new StringBuilder();
-        for (final var entry : metadataMap) {
-            var docId = entry.getKey();
-            var metadata = entry.getValue();
-            var title = metadata.title();
-            var lastModified = metadata.lastModified();
-            var pageSize = metadata.pageSize();
-            var wordsId = postingIndex.getWordsId(docId);
-            var linksId = linkIndexer.getChildLinksId(docId);
+            final var metadata = entry.getValue();
+            final var title = metadata.title();
+            final var lastModified = metadata.lastModified();
+            final var pageSize = metadata.pageSize();
 
             content.append(title).append("\n");
             content.append(urlIndexer.getURL(docId)).append("\n");
             content.append(lastModified).append(", ").append(pageSize).append("\n");
 
-            int count = 0;
-            for (var wordId : wordsId) {
-                var word = wordIndexer.getWord(wordId);
-                var frequency = postingIndex.getWordFrequency(wordId, docId);
+            postingIndex.getTotalWordsId(docId).stream().limit(10).forEach(wordId -> {
+                final var word = wordIndexer.getWord(wordId);
+                final var frequency = postingIndex.getTotalWordFrequency(docId, wordId);
                 content.append(word).append(" ").append(frequency).append("; ");
-                if (++count >= 10)
-                    break;
-            }
+            });
             content.append("\n");
 
-            count = 0;
-            for (var linkId : linksId) {
-                var childUrl = urlIndexer.getURL(linkId);
+            linkIndexer.getChildLinksId(docId).stream().limit(10).forEach(childId -> {
+                final var childUrl = urlIndexer.getURL(childId);
                 content.append(childUrl).append("\n");
-                if (++count >= 10)
-                    break;
-            }
+            });
             content.append("--------------------").append("\n");
         }
 
-        // create file, write content to file, and save file in the root directory of this project
-        var file = new File(filename);
-        var writer = new java.io.FileWriter(file);
-        writer.write(content.toString());
-        writer.close();
-
-        System.out.println("Output spider result to spider_result.txt");
+        // create and write to filename
+        Files.writeString(Paths.get(filename), content.toString(),
+                StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+        System.out.println("Finished writing spider result to " + filename);
     }
 
     @Override

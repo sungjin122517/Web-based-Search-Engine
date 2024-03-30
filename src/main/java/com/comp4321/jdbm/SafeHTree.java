@@ -1,12 +1,10 @@
 package com.comp4321.jdbm;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Queue;
 
 import jdbm.RecordManager;
 import jdbm.helper.FastIterator;
@@ -44,20 +42,18 @@ public class SafeHTree<K, V> implements Iterable<Entry<K, V>> {
         try {
             return new Iterator<Entry<K, V>>() {
                 private final FastIterator keyIt = htree.keys();
-                private final Queue<K> keys = new ArrayDeque<K>();
+                private K curKey = null;
+                private Boolean cachedHasNext = null;
 
                 @Override
+                @SuppressWarnings("unchecked")
                 public boolean hasNext() {
-                    if (!keys.isEmpty())
-                        return true;
+                    if (cachedHasNext != null)
+                        return cachedHasNext;
 
-                    @SuppressWarnings("unchecked")
-                    final var curKey = (K) keyIt.next();
-                    if (curKey == null)
-                        return false;
-
-                    keys.add(curKey);
-                    return true;
+                    curKey = (K) keyIt.next();
+                    cachedHasNext = curKey != null;
+                    return cachedHasNext;
                 }
 
                 @Override
@@ -65,9 +61,10 @@ public class SafeHTree<K, V> implements Iterable<Entry<K, V>> {
                     try {
                         if (!hasNext())
                             throw new NoSuchElementException();
+                        cachedHasNext = null;
 
                         return new Entry<K, V>() {
-                            private final K key = keys.remove();
+                            private final K key = curKey;
                             private final V value = get(key);
 
                             @Override

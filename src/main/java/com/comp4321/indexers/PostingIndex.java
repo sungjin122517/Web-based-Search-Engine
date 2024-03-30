@@ -4,9 +4,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.comp4321.jdbm.SafeHTree;
 
@@ -132,14 +137,14 @@ public class PostingIndex {
      * @param docId    The ID of the document
      * @param titleId  The ID of the title
      * @param location The location of the title
-     * @throws RuntimeException if an error occurs while adding the title to the
+     * @throws IndexerException if an error occurs while adding the title to the
      *                          index.
      */
     public void addTitle(Integer docId, Integer titleId, Integer location) {
         try {
             addWordToIndex(docId, titleId, location, docIdToTitleIdMap, titleIdToPostingsMap);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -149,14 +154,14 @@ public class PostingIndex {
      * @param docId    the ID of the document
      * @param wordId   the ID of the word
      * @param location the location of the word
-     * @throws RuntimeException if an error occurs while adding the word to the
+     * @throws IndexerException if an error occurs while adding the word to the
      *                          index
      */
     public void addWord(Integer docId, Integer wordId, Integer location) {
         try {
             addWordToIndex(docId, wordId, location, docIdToWordsIdMap, wordsIdToPostingsMap);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
         }
     }
 
@@ -190,14 +195,116 @@ public class PostingIndex {
      * Removes a document from the posting index.
      *
      * @param docId the ID of the document to be removed
-     * @throws RuntimeException if an error occurs while removing the document
+     * @throws IndexerException if an error occurs while removing the document
      */
     public void removeDocument(Integer docId) {
         try {
             removeDocumentFromIndex(docId, docIdToTitleIdMap, titleIdToPostingsMap);
             removeDocumentFromIndex(docId, docIdToWordsIdMap, wordsIdToPostingsMap);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IndexerException(String.format("DocId: %d", docId), e);
+        }
+    }
+
+    /**
+     * Retrieves a set of all word IDs associated with a given document ID.
+     *
+     * @param docId The document ID for which to retrieve the word IDs.
+     * @return A set of all word IDs associated with the given document ID.
+     * @throws IndexerException If an error occurs while retrieving the word IDs.
+     */
+    public Set<Integer> getTotalWordsId(Integer docId) {
+        try {
+            final var title = docIdToTitleIdMap.get(docId);
+            final var body = docIdToWordsIdMap.get(docId);
+            title.addAll(body);
+            return title;
+        } catch (IOException e) {
+            throw new IndexerException(String.format("DocId: %d", docId), e);
+        }
+    }
+
+    private int getWordFrequencyForIndex(Integer docId, Integer wordId,
+            SafeHTree<Integer, List<Posting>> invertedIndexMap)
+            throws IOException {
+        final var postings = invertedIndexMap.get(wordId);
+        if (postings == null)
+            return 0;
+
+        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
+                Comparator.comparing(Posting::docId));
+        if (postingIdx < 0)
+            return 0;
+
+        return postings.get(postingIdx).locations().size();
+    }
+
+    /**
+     * Returns the total frequency of a word in a document.
+     *
+     * @param docId  the ID of the document
+     * @param wordId the ID of the word
+     * @return the total frequency of the word in the document
+     * @throws IndexerException if an error occurs while accessing the index
+     */
+    public int getTotalWordFrequency(Integer docId, Integer wordId) {
+        try {
+            final var titleCount = getWordFrequencyForIndex(docId, wordId, titleIdToPostingsMap);
+            final var wordCount = getWordFrequencyForIndex(docId, wordId, wordsIdToPostingsMap);
+
+            return titleCount + wordCount;
+        } catch (IOException e) {
+            throw new IndexerException(String.format("DocId: %d", docId), e);
+        }
+    }
+
+    private Map<Integer, Double> getScoresForIndex(Set<Integer> wordIds,
+            SafeHTree<Integer, List<Posting>> invertedIndexMap, Integer indexSize)
+            throws IOException {
+        final var scores = new HashMap<Integer, Double>();
+
+        for (final var wordId : wordIds) {
+            final var df = wordIdToDfMap.get(wordId);
+            final var idf = Math.log((double) indexSize / df);
+
+            final var postings = invertedIndexMap.get(wordId);
+            for (final var posting : postings) {
+                final var docId = posting.docId();
+                final var tf = posting.locations().size();
+                final var tfMax = docIdToTFMaxMap.get(docId);
+
+                final var score = tf * idf / tfMax;
+                scores.merge(docId, score, Double::sum);
+            }
+        }
+
+        return scores;
+    }
+
+    /**
+     * Calculates the scores for a given set of word IDs. Currently, match in title
+     * and body are considered equally important.
+     *
+     * @param wordIds   the set of word IDs for which scores need to be calculated
+     * @param indexSize the total number of documents in the index
+     * @return a map of document IDs to their corresponding scores
+     * @throws IndexerException if an error occurs while calculating the scores
+     */
+    public Map<Integer, Double> getScores(Set<Integer> wordIds, Integer indexSize) {
+        try {
+            // Individual scores for title and body
+            final var titleScores = getScoresForIndex(wordIds, titleIdToPostingsMap, indexSize);
+            final var bodyScores = getScoresForIndex(wordIds, wordsIdToPostingsMap, indexSize);
+
+            // Combine the scores
+            final var totalScores = Stream.of(titleScores, bodyScores).flatMap(m -> m.entrySet().stream())
+                    .collect(Collectors.toMap(Entry::getKey, Entry::getValue, Double::sum));
+
+            // TODO: Normalize the scores to cosine similarity
+            return totalScores;
+
+        } catch (IOException e) {
+            throw new IndexerException("Error while calculating scores", e);
         }
     }
 
@@ -237,27 +344,5 @@ public class PostingIndex {
             System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
         System.out.println();
-    }
-
-    // method to get list of words id for a given docId
-    public Set<Integer> getWordsId(Integer docId) {
-        try {
-            return docIdToWordsIdMap.get(docId);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    // given a wordId and docId, return the frequency of the word in the document
-    public int getWordFrequency(Integer wordId, Integer docId) {
-        try {
-            final var wordPostings = wordsIdToPostingsMap.get(wordId);
-            final var wordIdx = Collections.binarySearch(wordPostings, new Posting(docId), Comparator.comparing(Posting::docId));
-            final var wordCount = (0 <= wordIdx && wordIdx < wordPostings.size()) ? wordPostings.get(wordIdx).locations().size() : 0;
-
-            return wordCount;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 }
