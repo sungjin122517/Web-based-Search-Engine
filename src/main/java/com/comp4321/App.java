@@ -20,10 +20,6 @@ public class App {
                     indexer.bfs(baseURL, maxPages);
                     break;
 
-                case "spider_result":
-                    indexer.outputSpiderResult("spider_result.txt");
-                    break;
-
                 case "print":
                     indexer.printAll();
                     break;

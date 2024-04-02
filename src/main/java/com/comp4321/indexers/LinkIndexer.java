@@ -110,12 +110,4 @@ public class LinkIndexer {
         }
         System.out.println();
     }
-
-    public Set<Integer> getChildLinksId(int docId) {
-        try {
-            return parentToChildMap.get(docId);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
-    }
 }

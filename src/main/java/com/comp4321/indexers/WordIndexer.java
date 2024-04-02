@@ -49,21 +49,6 @@ public class WordIndexer {
         }
     }
 
-    /**
-     * Retrieves the word associated with the given ID.
-     *
-     * @param id The ID of the word to retrieve.
-     * @return The word associated with the given ID.
-     * @throws IndexerException If an error occurs while retrieving the word.
-     */
-    public String getWord(Integer id) {
-        try {
-            return idToWordMap.find(id);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("WordId: %d", id), e);
-        }
-    }
-
     public void printAll() throws IOException {
         System.out.println("WORD_TO_ID:");
         for (final var entry : wordToIdMap) {

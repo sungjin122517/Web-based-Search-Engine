@@ -1,14 +1,12 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.Map.Entry;
 
 import com.comp4321.jdbm.SafeHTree;
 
 import jdbm.RecordManager;
 
-public class MetadataIndexer implements Iterable<Entry<Integer, Metadata>> {
+public class MetadataIndexer {
     public static final String DOCID_TO_METADATA = "docIdToMetadata";
 
     private final SafeHTree<Integer, Metadata> metadataMap;
@@ -73,10 +71,5 @@ public class MetadataIndexer implements Iterable<Entry<Integer, Metadata>> {
             System.out.println(entry.getKey() + " -> " + entry.getValue().toString());
         }
         System.out.println();
-    }
-
-    @Override
-    public Iterator<Entry<Integer, Metadata>> iterator() {
-        return metadataMap.iterator();
     }
 }

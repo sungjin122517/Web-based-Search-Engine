@@ -206,58 +206,6 @@ public class PostingIndex {
         }
     }
 
-    /**
-     * Retrieves a set of all word IDs associated with a given document ID.
-     *
-     * @param docId The document ID for which to retrieve the word IDs.
-     * @return A set of all word IDs associated with the given document ID.
-     * @throws IndexerException If an error occurs while retrieving the word IDs.
-     */
-    public Set<Integer> getTotalWordsId(Integer docId) {
-        try {
-            final var title = docIdToTitleIdMap.get(docId);
-            final var body = docIdToWordsIdMap.get(docId);
-            title.addAll(body);
-            return title;
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
-    }
-
-    private int getWordFrequencyForIndex(Integer docId, Integer wordId,
-            SafeHTree<Integer, List<Posting>> invertedIndexMap)
-            throws IOException {
-        final var postings = invertedIndexMap.get(wordId);
-        if (postings == null)
-            return 0;
-
-        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
-                Comparator.comparing(Posting::docId));
-        if (postingIdx < 0)
-            return 0;
-
-        return postings.get(postingIdx).locations().size();
-    }
-
-    /**
-     * Returns the total frequency of a word in a document.
-     *
-     * @param docId  the ID of the document
-     * @param wordId the ID of the word
-     * @return the total frequency of the word in the document
-     * @throws IndexerException if an error occurs while accessing the index
-     */
-    public int getTotalWordFrequency(Integer docId, Integer wordId) {
-        try {
-            final var titleCount = getWordFrequencyForIndex(docId, wordId, titleIdToPostingsMap);
-            final var wordCount = getWordFrequencyForIndex(docId, wordId, wordsIdToPostingsMap);
-
-            return titleCount + wordCount;
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
-    }
-
     private Map<Integer, Double> getScoresForIndex(Set<Integer> wordIds,
             SafeHTree<Integer, List<Posting>> invertedIndexMap, Integer indexSize)
             throws IOException {

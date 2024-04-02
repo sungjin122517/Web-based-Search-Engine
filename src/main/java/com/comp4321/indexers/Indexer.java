@@ -2,10 +2,6 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -161,58 +157,6 @@ public class Indexer implements AutoCloseable {
         linkIndexer.printAll();
         wordIndexer.printAll();
         postingIndex.printAll();
-    }
-
-    /**
-     * Outputs the spider result to a file.
-     *
-     * @param filename the name of the file to write the spider result to
-     * @throws IOException if an I/O error occurs while writing the file
-     */
-    public void outputSpiderResult(String filename) throws IOException {
-        /*
-         * page title
-         * url
-         * last modification date, size of page
-         * keyword 1 frequency 1; keyword 2 frequency 2; ...; keyword 10 frequency 10
-         * child link 1
-         * child link 2
-         * ...
-         * child link 10
-         * --------------------
-         */
-        final var content = new StringBuilder();
-        for (final var entry : metadataIndexer) {
-            final var docId = entry.getKey();
-
-            final var metadata = entry.getValue();
-            final var title = metadata.title();
-            final var lastModified = metadata.lastModified();
-            final var pageSize = metadata.pageSize();
-
-            content.append(title).append("\n");
-            content.append(urlIndexer.getURL(docId)).append("\n");
-            content.append(lastModified).append(", ").append(pageSize).append("\n");
-
-            postingIndex.getTotalWordsId(docId).stream().limit(10).forEach(wordId -> {
-                final var word = wordIndexer.getWord(wordId);
-                final var frequency = postingIndex.getTotalWordFrequency(docId, wordId);
-                content.append(word).append(" ").append(frequency).append("; ");
-            });
-            content.append("\n");
-
-            linkIndexer.getChildLinksId(docId).stream().limit(10).forEach(childId -> {
-                final var childUrl = urlIndexer.getURL(childId);
-                content.append(childUrl).append("\n");
-            });
-            content.append("--------------------").append("\n");
-        }
-
-        // create and write to filename
-        Files.writeString(Paths.get(filename), content.toString(),
-                StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING);
-        System.out.println("Finished writing spider result to " + filename);
     }
 
     @Override
