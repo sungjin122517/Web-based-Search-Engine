@@ -1,10 +1,12 @@
 package com.comp4321.jdbm;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 
 import jdbm.RecordManager;
 import jdbm.helper.FastIterator;
@@ -35,6 +37,14 @@ public class SafeHTree<K, V> implements Iterable<Entry<K, V>> {
 
     public void remove(K key) throws IOException {
         htree.remove(key);
+    }
+
+    public Set<K> keySet() throws IOException {
+        final var keys = new HashSet<K>();
+        for (final var entry : this)
+            keys.add(entry.getKey());
+
+        return keys;
     }
 
     @Override

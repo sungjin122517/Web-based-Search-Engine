@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.comp4321.jdbm.SafeBTree;
 import com.comp4321.jdbm.SafeHTree;
 
 import jdbm.RecordManager;
@@ -24,27 +25,35 @@ public class PostingIndex {
     public final static String WORDSID_TO_POSTINGS = "wordsIdToPostings";
     public final static String DOCID_TO_TFMAX = "docIdToTfMax";
     public final static String WORDID_TO_DF = "wordIdToDf";
+    public final static String DOCID_TO_LENGTH = "docIdToLength";
 
     // Inverted indexes are maintained in sorted order for efficient search
     private final SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap;
     private final SafeHTree<Integer, List<Posting>> titleIdToPostingsMap;
     private final SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap;
     private final SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap;
-    private final SafeHTree<Integer, Integer> docIdToTFMaxMap;
+    private final SafeBTree<Integer, Integer> docIdToTFMaxMap;
     private final SafeHTree<Integer, Integer> wordIdToDfMap;
+    private final SafeHTree<Integer, Double> docIdToLengthMap;
+
+    // Flag to check if the document lengths have been initialized after indexing
+    private boolean isDocLengthInitialized;
 
     public PostingIndex(SafeHTree<Integer, Set<Integer>> docIdToTitleIdMap,
             SafeHTree<Integer, List<Posting>> titleIdToPostingsMap,
             SafeHTree<Integer, Set<Integer>> docIdToWordsIdMap,
             SafeHTree<Integer, List<Posting>> wordsIdToPostingsMap,
-            SafeHTree<Integer, Integer> docIdToTFMaxMap,
-            SafeHTree<Integer, Integer> wordIdToDfMap) {
+            SafeBTree<Integer, Integer> docIdToTFMaxMap,
+            SafeHTree<Integer, Integer> wordIdToDfMap,
+            SafeHTree<Integer, Double> docIdToLengthMap) {
         this.titleIdToPostingsMap = titleIdToPostingsMap;
         this.docIdToTitleIdMap = docIdToTitleIdMap;
         this.wordsIdToPostingsMap = wordsIdToPostingsMap;
         this.docIdToWordsIdMap = docIdToWordsIdMap;
         this.docIdToTFMaxMap = docIdToTFMaxMap;
         this.wordIdToDfMap = wordIdToDfMap;
+        this.docIdToLengthMap = docIdToLengthMap;
+        this.isDocLengthInitialized = false;
     }
 
     public PostingIndex(RecordManager recman) throws IOException {
@@ -52,8 +61,9 @@ public class PostingIndex {
                 new SafeHTree<Integer, List<Posting>>(recman, TITLEID_TO_POSTINGS),
                 new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_WORDSID),
                 new SafeHTree<Integer, List<Posting>>(recman, WORDSID_TO_POSTINGS),
-                new SafeHTree<Integer, Integer>(recman, DOCID_TO_TFMAX),
-                new SafeHTree<Integer, Integer>(recman, WORDID_TO_DF));
+                new SafeBTree<Integer, Integer>(recman, DOCID_TO_TFMAX, Comparator.naturalOrder()),
+                new SafeHTree<Integer, Integer>(recman, WORDID_TO_DF),
+                new SafeHTree<Integer, Double>(recman, DOCID_TO_LENGTH));
     }
 
     private void updateDF(Integer wordId) throws IOException {
@@ -91,9 +101,9 @@ public class PostingIndex {
         }
 
         final var tfMax = titleCount + wordCount;
-        final var curTFMax = docIdToTFMaxMap.get(docId);
+        final var curTFMax = docIdToTFMaxMap.find(docId);
         if (curTFMax == null || curTFMax < tfMax)
-            docIdToTFMaxMap.put(docId, tfMax);
+            docIdToTFMaxMap.insert(docId, tfMax);
     }
 
     private void addWordToIndex(Integer docId, Integer wordId, Integer location,
@@ -129,6 +139,9 @@ public class PostingIndex {
         // Update the TFMax and DF
         updateTFMax(docId, wordId);
         updateDF(wordId);
+
+        // Set the document length initialization flag to false
+        isDocLengthInitialized = false;
     }
 
     /**
@@ -189,6 +202,9 @@ public class PostingIndex {
 
             updateDF(wordId);
         }
+
+        // Set the document length initialization flag to false
+        isDocLengthInitialized = false;
     }
 
     /**
@@ -206,22 +222,91 @@ public class PostingIndex {
         }
     }
 
-    private Map<Integer, Double> getScoresForIndex(Set<Integer> wordIds,
-            SafeHTree<Integer, List<Posting>> invertedIndexMap, Integer indexSize)
-            throws IOException {
-        final var scores = new HashMap<Integer, Double>();
+    private void initializeDocumentLength() {
+        // No need to reinitialize if already initialized
+        if (isDocLengthInitialized)
+            return;
 
+        try {
+            // Clear the existing document lengths.
+            // We do not use recman.delete() because deleting and creating a record
+            // with the same name can cause weird issues
+            for (final var key : docIdToLengthMap.keySet()) {
+                docIdToLengthMap.remove(key);
+            }
+
+            // Calculate the document lengths by iterating over the inverted index
+            // and adding (tf * idf / tfMax)^2 for each term in the index
+            final var indexSize = docIdToTFMaxMap.size();
+
+            for (final var postings : wordsIdToPostingsMap) {
+                final var wordId = postings.getKey();
+                final var df = wordIdToDfMap.get(wordId);
+                final var idf = Math.log((double) indexSize / df);
+
+                for (final var posting : postings.getValue()) {
+                    final var docId = posting.docId();
+                    final var tf = posting.locations().size();
+                    final var tfMax = docIdToTFMaxMap.find(docId);
+
+                    final var toAdd = Math.pow(tf * idf / tfMax, 2.0);
+
+                    var curScore = docIdToLengthMap.get(docId);
+                    if (curScore == null)
+                        curScore = 0.0;
+                    docIdToLengthMap.put(docId, curScore + toAdd);
+                }
+            }
+
+            for (final var postings : titleIdToPostingsMap) {
+                final var titleId = postings.getKey();
+                final var df = wordIdToDfMap.get(titleId);
+                final var idf = Math.log((double) indexSize / df);
+
+                for (final var posting : postings.getValue()) {
+                    final var docId = posting.docId();
+                    final var tf = posting.locations().size();
+                    final var tfMax = docIdToTFMaxMap.find(docId);
+
+                    final var toAdd = Math.pow(tf * idf / tfMax, 2.0);
+
+                    var curScore = docIdToLengthMap.get(docId);
+                    if (curScore == null)
+                        curScore = 0.0;
+                    docIdToLengthMap.put(docId, curScore + toAdd);
+                }
+            }
+
+            isDocLengthInitialized = true;
+        } catch (IOException e) {
+            throw new IndexerException("Error while initializing document lengths", e);
+        }
+    }
+
+    private Map<Integer, Double> getScoresForIndex(Set<Integer> wordIds,
+            SafeHTree<Integer, List<Posting>> invertedIndexMap)
+            throws IOException {
+        // Initialize the document lengths
+        initializeDocumentLength();
+
+        final var indexSize = docIdToTFMaxMap.size();
+        final var scores = new HashMap<Integer, Double>();
         for (final var wordId : wordIds) {
             final var df = wordIdToDfMap.get(wordId);
             final var idf = Math.log((double) indexSize / df);
 
             final var postings = invertedIndexMap.get(wordId);
+            if (postings == null)
+                continue;
+
             for (final var posting : postings) {
                 final var docId = posting.docId();
                 final var tf = posting.locations().size();
-                final var tfMax = docIdToTFMaxMap.get(docId);
+                final var tfMax = docIdToTFMaxMap.find(docId);
+                final var docLength = Math.sqrt(docIdToLengthMap.get(docId));
 
-                final var score = tf * idf / tfMax;
+                final var score = tf * idf / tfMax / docLength;
+
                 scores.merge(docId, score, Double::sum);
             }
         }
@@ -231,24 +316,25 @@ public class PostingIndex {
 
     /**
      * Calculates the scores for a given set of word IDs. Currently, match in title
-     * and body are considered equally important.
+     * are given more weight by multiplying the score by 2.
      *
-     * @param wordIds   the set of word IDs for which scores need to be calculated
-     * @param indexSize the total number of documents in the index
+     * @param wordIds the set of word IDs for which scores need to be calculated
      * @return a map of document IDs to their corresponding scores
      * @throws IndexerException if an error occurs while calculating the scores
      */
-    public Map<Integer, Double> getScores(Set<Integer> wordIds, Integer indexSize) {
+    public Map<Integer, Double> getScores(Set<Integer> wordIds) {
         try {
             // Individual scores for title and body
-            final var titleScores = getScoresForIndex(wordIds, titleIdToPostingsMap, indexSize);
-            final var bodyScores = getScoresForIndex(wordIds, wordsIdToPostingsMap, indexSize);
+            final var titleScores = getScoresForIndex(wordIds, titleIdToPostingsMap);
+            final var bodyScores = getScoresForIndex(wordIds, wordsIdToPostingsMap);
+
+            // Double the score for title to make it more important
+            titleScores.replaceAll((k, v) -> 2 * v);
 
             // Combine the scores
             final var totalScores = Stream.of(titleScores, bodyScores).flatMap(m -> m.entrySet().stream())
                     .collect(Collectors.toMap(Entry::getKey, Entry::getValue, Double::sum));
 
-            // TODO: Normalize the scores to cosine similarity
             return totalScores;
 
         } catch (IOException e) {
@@ -289,6 +375,12 @@ public class PostingIndex {
 
         System.out.println("WORDID_TO_DF:");
         for (final var entry : wordIdToDfMap) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
+        }
+        System.out.println();
+
+        System.out.println("DOCID_TO_LENGTH:");
+        for (final var entry : docIdToLengthMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
         System.out.println();

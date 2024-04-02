@@ -5,6 +5,8 @@ import java.net.URL;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -144,6 +146,27 @@ public class Indexer implements AutoCloseable {
                         }
                     });
         }
+    }
+
+    /**
+     * Searches for documents for the set of words.
+     *
+     * @param words the set of words to search for
+     * @return a map of document urls to their corresponding scores
+     */
+    public Map<String, Double> search(Set<String> words) {
+        final var wordIds = words.stream().map(String::toLowerCase)
+                .filter(w -> !stopStem.isStopWord(w))
+                .map(porter::stripAffixes)
+                .filter(w -> !w.isBlank())
+                .map(wordIndexer::getOrCreateId)
+                .collect(Collectors.toSet());
+        final var scores = postingIndex.getScores(wordIds);
+
+        final var urlScores = scores.entrySet().stream()
+                .collect(Collectors.toMap(e -> urlIndexer.getURL(e.getKey()), Map.Entry::getValue));
+
+        return urlScores;
     }
 
     /**
