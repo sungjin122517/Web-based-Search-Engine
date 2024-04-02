@@ -41,6 +41,18 @@
       <plugin>
         <artifactId>maven-clean-plugin</artifactId>
         <version>3.3.2</version>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>${basedir}</directory>
+              <includes>
+                <include>indexes.db</include>
+                <include>indexes.lg</include>
+              </includes>
+              <followSymlinks>false</followSymlinks>
+            </fileset>
+          </filesets>
+        </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
