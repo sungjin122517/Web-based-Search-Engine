@@ -20,6 +20,13 @@ class NewString {
 
 public class Porter {
 
+   public static void main(String args[]) {
+      final var input = System.console().readLine();
+      final var porter = new Porter();
+      final var output = porter.stripAffixes(input);
+      System.out.println(output);
+   }
+
    private String clean(String str) {
       int last = str.length();
 
