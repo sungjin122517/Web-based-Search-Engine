@@ -1,4 +1,4 @@
-package com.comp4321.indexers;
+package com.comp4321.indexers.posting;
 
 import java.io.Serializable;
 import java.util.Collections;

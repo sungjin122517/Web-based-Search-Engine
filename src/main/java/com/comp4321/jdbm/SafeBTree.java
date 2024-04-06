@@ -36,7 +36,8 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
     }
 
     public void remove(K key) throws IOException {
-        btree.remove(key);
+        if (btree.find(key) != null)
+            btree.remove(key);
     }
 
     public int size() {

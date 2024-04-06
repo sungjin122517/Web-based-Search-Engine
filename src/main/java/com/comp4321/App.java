@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import org.htmlparser.util.ParserException;
+
 import com.comp4321.indexers.Indexer;
 
 public class App {
@@ -38,6 +40,10 @@ public class App {
                     System.out.println("Unknown argument. Use 'crawl' or 'search <words>'");
                     System.exit(1);
             }
+        } catch (IOException | ParserException e) {
+            System.err.println("An error occurred: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
         }
     }
 }
