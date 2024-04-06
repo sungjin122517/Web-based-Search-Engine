@@ -199,7 +199,7 @@ public class InvertedIndex {
     /**
      * Calculates the scores for a given set of word IDs.
      * Match in title is given priority by multiplying the term frequency in title
-     * by 2 before calculating the score.
+     * by 10 before calculating the score.
      *
      * @param wordIds the set of word IDs for which scores need to be calculated
      * @return a map of document IDs to their corresponding scores
@@ -207,7 +207,7 @@ public class InvertedIndex {
      */
     public Map<Integer, Double> getScores(Set<Integer> wordIds) throws IOException {
 
-        // Scores are calculated as (2 * title_tf + body_tf) * log(N / df) / tfMax
+        // Scores are calculated as (10 * title_tf + body_tf) * log(N / df) / tfMax
         // title_tf: term frequency in the title of the document
         // body_tf: term frequency in the body of the document
         // N: total number of documents
@@ -244,8 +244,8 @@ public class InvertedIndex {
 
                     var tf = 0;
                     if (titleDocId == docId) {
-                        // Multiply the term weight by 2 for title
-                        tf += titlePosting.locations().size() * 2;
+                        // Multiply the term weight by 10 for title
+                        tf += titlePosting.locations().size() * 10;
                         ++titleIdx;
                     }
 
@@ -259,7 +259,7 @@ public class InvertedIndex {
                 while (titleIdx < titlePostings.size()) {
                     final var titlePosting = titlePostings.get(titleIdx);
                     final var docId = titlePosting.docId();
-                    final var tf = titlePosting.locations().size();
+                    final var tf = titlePosting.locations().size() * 10; // See above for the multiplier
                     final var tfMax = docIdToTFMaxMap.find(docId);
                     final var df = wordIdToDFMap.find(wordId);
                     final var idf = Math.log((double) totalDocuments / df);
