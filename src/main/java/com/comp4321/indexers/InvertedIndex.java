@@ -200,6 +200,7 @@ public class InvertedIndex {
      * Calculates the scores for a given set of word IDs.
      * Match in title is given priority by multiplying the term frequency in title
      * by 10 before calculating the score.
+     * This means that scores are not bounded by 1.
      *
      * @param wordIds the set of word IDs for which scores need to be calculated
      * @return a map of document IDs to their corresponding scores
