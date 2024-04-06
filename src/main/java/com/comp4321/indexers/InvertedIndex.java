@@ -294,6 +294,22 @@ public class InvertedIndex {
         return scores;
     }
 
+    /**
+     * Returns a set of document IDs that contain the given phrases.
+     *
+     * @param phrases a list of phrases, where each phrase is represented as a list
+     *                of word IDs
+     * @return a set of document IDs that contain the given phrases
+     */
+    public Set<Integer> getDocumentsWithPhrases(List<List<Integer>> phrases) {
+        // TODO: Implement this method
+        // It currently returns all the documents
+        final var docIds = new HashSet<Integer>();
+        for (final var entry : docIdToTFMaxMap)
+            docIds.add(entry.getKey());
+        return docIds;
+    }
+
     public void printAll() throws IOException {
         titleIndex.printAll();
         bodyIndex.printAll();

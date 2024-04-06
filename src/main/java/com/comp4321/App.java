@@ -2,6 +2,7 @@ package com.comp4321;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.htmlparser.util.ParserException;
@@ -26,7 +27,7 @@ public class App {
 
                 case "search":
                     final var words = Arrays.stream(args).skip(1).collect(Collectors.toSet());
-                    final var results = indexer.search(words);
+                    final var results = indexer.search(words, List.of());
                     results.entrySet().stream()
                             .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
                             .forEach(e -> System.out.println(e.getKey() + ": " + e.getValue()));

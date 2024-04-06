@@ -5,6 +5,7 @@ import java.net.URL;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -166,12 +167,16 @@ public class Indexer implements AutoCloseable {
     }
 
     /**
-     * Searches for documents for the set of words.
+     * Searches for the given set of words and list of phrases in the index.
+     * Returns a map of URLs and their corresponding scores.
      *
-     * @param words the set of words to search for
-     * @return a map of document urls to their corresponding scores
+     * @param words   the set of words to search for (words in phrases are included)
+     * @param phrases the list of phrases to search for
+     * @return a map of URLs and their corresponding scores
+     * @throws IOException if an I/O error occurs while searching the index
      */
-    public Map<String, Double> search(Set<String> words) throws IOException {
+    public Map<String, Double> search(Set<String> words, List<List<String>> phrases) throws IOException {
+        // Compute the scores for the given words
         final var wordIds = words.stream().map(String::toLowerCase)
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
@@ -180,9 +185,33 @@ public class Indexer implements AutoCloseable {
                 .collect(Collectors.toSet());
         final var scores = invertedIndex.getScores(wordIds);
 
+        // Get the documents with the given phrases
+        final var phraseIds = phrases.stream().map(phrase -> phrase.stream().map(String::toLowerCase)
+                .filter(w -> !stopStem.isStopWord(w))
+                .map(porter::stripAffixes)
+                .filter(w -> !w.isBlank())
+                .map(wordIndexer::getOrCreateId).toList()).toList();
+        final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
+
+        // Filter the scores with the documents with the given phrases
+        // and convert the document IDs to URLs
         final var urlScores = scores.entrySet().stream()
+                .filter(e -> documentsWithPhrases.contains(e.getKey()))
                 .collect(Collectors.toMap(e -> urlIndexer.getURL(e.getKey()), Map.Entry::getValue));
 
+        /**
+         * TODO: Show the search results in following format:
+         * score page title
+         * url
+         * last modification date, size of page
+         * keyword 1 freq 1; keyword 2 freq 2; . . .
+         * Parent link 1
+         * Parent link 2
+         * ... ...
+         * Child link 1
+         * Child link 2
+         * ... ...
+         */
         return urlScores;
     }
 
