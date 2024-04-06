@@ -19,6 +19,8 @@ import com.comp4321.IRUtilities.Porter;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
+import me.tongfei.progressbar.ProgressBarBuilder;
+import me.tongfei.progressbar.ProgressBarStyle;
 
 public class Indexer implements AutoCloseable {
     private static final String DB_NAME = "indexes";
@@ -126,32 +128,40 @@ public class Indexer implements AutoCloseable {
         final var queue = new ArrayDeque<String>();
         final var visited = new HashSet<String>();
 
-        visited.add(baseURL);
-        if (isFreshDocument(baseURL)) {
-            queue.add(baseURL);
-            indexDocument(baseURL);
-        }
+        try (final var pb = new ProgressBarBuilder()
+                .setTaskName("Crawl")
+                .setInitialMax(maxPages)
+                .setStyle(ProgressBarStyle.ASCII)
+                .build()) {
+            visited.add(baseURL);
+            if (isFreshDocument(baseURL)) {
+                queue.add(baseURL);
+                indexDocument(baseURL);
+            }
+            pb.step();
 
-        final var lb = new LinkBean();
-        while (!queue.isEmpty() && visited.size() < maxPages) {
-            final var curURL = queue.remove();
-            lb.setURL(curURL);
+            final var lb = new LinkBean();
+            while (!queue.isEmpty() && visited.size() < maxPages) {
+                final var curURL = queue.remove();
+                lb.setURL(curURL);
 
-            Arrays.stream(lb.getLinks())
-                    .map(URL::toString)
-                    .forEach(link -> {
-                        try {
-                            if (!visited.contains(link) && visited.size() < maxPages) {
-                                visited.add(link);
-                                if (isFreshDocument(link)) {
-                                    queue.add(link);
-                                    indexDocument(link);
+                Arrays.stream(lb.getLinks())
+                        .map(URL::toString)
+                        .forEach(link -> {
+                            try {
+                                if (!visited.contains(link) && visited.size() < maxPages) {
+                                    visited.add(link);
+                                    if (isFreshDocument(link)) {
+                                        queue.add(link);
+                                        indexDocument(link);
+                                    }
+                                    pb.step();
                                 }
+                            } catch (IOException | ParserException e) {
+                                throw new IndexerException("Failed to index document", e);
                             }
-                        } catch (IOException | ParserException e) {
-                            throw new IndexerException("Failed to index document", e);
-                        }
-                    });
+                        });
+            }
         }
     }
 
