@@ -45,7 +45,7 @@ public class Indexer implements AutoCloseable {
         invertedIndex = new InvertedIndex(recman);
     }
 
-    private boolean isFreshDocument(String url) throws ParserException {
+    private boolean isFreshDocument(String url) throws IOException, ParserException {
         final var crawler = new Crawler(url);
         final var curLastModified = crawler.getLastModified();
 
@@ -80,7 +80,13 @@ public class Indexer implements AutoCloseable {
         metadataIndexer.addMetadata(docId, new Metadata(title, curLastModified, pageSize));
 
         // Add the links to link index
-        final var links = crawler.extractLinks().stream().map(urlIndexer::getOrCreateDocumentId)
+        final var links = crawler.extractLinks().stream().map(childUrl -> {
+            try {
+                return urlIndexer.getOrCreateDocumentId(childUrl);
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get or create document ID", e);
+            }
+        })
                 .collect(Collectors.toSet());
         linkIndexer.addLinks(docId, links);
 
@@ -91,7 +97,13 @@ public class Indexer implements AutoCloseable {
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
                 .filter(w -> !w.isBlank())
-                .map(wordIndexer::getOrCreateId)
+                .map(word -> {
+                    try {
+                        return wordIndexer.getOrCreateId(word);
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get or create word ID", e);
+                    }
+                })
                 .toList();
         IntStream.range(0, titles.size()).forEach(i -> {
             try {
@@ -107,7 +119,13 @@ public class Indexer implements AutoCloseable {
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
                 .filter(w -> !w.isBlank())
-                .map(wordIndexer::getOrCreateId)
+                .map(word -> {
+                    try {
+                        return wordIndexer.getOrCreateId(word);
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get or create word ID", e);
+                    }
+                })
                 .toList();
         IntStream.range(0, words.size()).forEach(i -> {
             try {
@@ -181,7 +199,13 @@ public class Indexer implements AutoCloseable {
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
                 .filter(w -> !w.isBlank())
-                .map(wordIndexer::getOrCreateId)
+                .map(word -> {
+                    try {
+                        return wordIndexer.getOrCreateId(word);
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get or create word ID", e);
+                    }
+                })
                 .collect(Collectors.toSet());
         final var scores = invertedIndex.getScores(wordIds);
 
@@ -190,14 +214,26 @@ public class Indexer implements AutoCloseable {
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
                 .filter(w -> !w.isBlank())
-                .map(wordIndexer::getOrCreateId).toList()).toList();
+                .map(word -> {
+                    try {
+                        return wordIndexer.getOrCreateId(word);
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get or create word ID", e);
+                    }
+                }).toList()).toList();
         final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
 
         // Filter the scores with the documents with the given phrases
         // and convert the document IDs to URLs
         final var urlScores = scores.entrySet().stream()
-                .filter(e -> documentsWithPhrases.contains(e.getKey()))
-                .collect(Collectors.toMap(e -> urlIndexer.getURL(e.getKey()), Map.Entry::getValue));
+                .filter(entry -> documentsWithPhrases.contains(entry.getKey()))
+                .collect(Collectors.toMap(entry -> {
+                    try {
+                        return urlIndexer.getURL(entry.getKey());
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get URL", e);
+                    }
+                }, Map.Entry::getValue));
 
         /**
          * TODO: Show the search results in following format:

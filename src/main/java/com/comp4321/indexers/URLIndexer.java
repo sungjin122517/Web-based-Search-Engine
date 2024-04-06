@@ -33,22 +33,18 @@ public class URLIndexer {
      *
      * @param url The URL for which to retrieve or create a document ID.
      * @return The document ID associated with the URL.
-     * @throws IndexerException If an error occurs while retrieving or creating the
+     * @throws IOException If an error occurs while retrieving or creating the
      *                          document ID.
      */
-    public Integer getOrCreateDocumentId(String url) {
-        try {
-            final var value = urlToDocIdMap.find(url);
-            if (value != null)
-                return value;
+    public Integer getOrCreateDocumentId(String url) throws IOException {
+        final var value = urlToDocIdMap.find(url);
+        if (value != null)
+            return value;
 
-            final var docId = urlToDocIdMap.size() + 1;
-            urlToDocIdMap.insert(url, docId);
-            docIdToUrlMap.insert(docId, url);
-            return docId;
-        } catch (IOException e) {
-            throw new IndexerException(url, e);
-        }
+        final var docId = urlToDocIdMap.size() + 1;
+        urlToDocIdMap.insert(url, docId);
+        docIdToUrlMap.insert(docId, url);
+        return docId;
     }
 
     /**
@@ -57,17 +53,13 @@ public class URLIndexer {
      * @param docId The document ID for which to retrieve the URL.
      * @return The URL associated with the given document ID.
      * @throws NoSuchElementException If the document ID is not found in the index.
-     * @throws IndexerException       If an error occurs while retrieving the URL.
+     * @throws IOException       If an error occurs while retrieving the URL.
      */
-    public String getURL(Integer docId) {
-        try {
-            final var url = docIdToUrlMap.find(docId);
-            if (url == null)
-                throw new NoSuchElementException();
-            return url;
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
+    public String getURL(Integer docId) throws IOException {
+        final var url = docIdToUrlMap.find(docId);
+        if (url == null)
+            throw new NoSuchElementException();
+        return url;
     }
 
     public void printAll() throws IOException {

@@ -24,14 +24,10 @@ public class MetadataIndexer {
      * 
      * @param docId The document ID.
      * @return The metadata for the document, or null if no metadata exists.
-     * @throws IndexerException if an error occurs while getting the metadata.
+     * @throws IOException if an error occurs while getting the metadata.
      */
-    public Metadata getMetadata(int docId) {
-        try {
-            return (Metadata) metadataMap.get(docId);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
+    public Metadata getMetadata(int docId) throws IOException {
+        return metadataMap.get(docId);
     }
 
     /**
@@ -41,28 +37,10 @@ public class MetadataIndexer {
      *
      * @param docId    The document ID.
      * @param metadata The metadata to be added.
-     * @throws IndexerException if an error occurs while adding the metadata.
+     * @throws IOException if an error occurs while adding the metadata.
      */
-    public void addMetadata(int docId, Metadata metadata) {
-        try {
-            metadataMap.put(docId, metadata);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
-    }
-
-    /**
-     * Removes the metadata associated with the given document ID.
-     *
-     * @param docId the ID of the document whose metadata needs to be removed
-     * @throws IndexerException if an IOException occurs while removing the metadata
-     */
-    public void removeMetadata(int docId) {
-        try {
-            metadataMap.remove(docId);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
+    public void addMetadata(int docId, Metadata metadata) throws IOException {
+        metadataMap.put(docId, metadata);
     }
 
     public void printAll() throws IOException {

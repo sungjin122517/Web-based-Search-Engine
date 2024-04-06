@@ -32,21 +32,17 @@ public class WordIndexer {
      *
      * @param word the word to retrieve the ID for
      * @return the ID associated with the word
-     * @throws IndexerException if an error occurs while accessing the wordToIdMap
+     * @throws IOException if an error occurs while accessing the wordToIdMap
      */
-    public Integer getOrCreateId(String word) {
-        try {
-            final var value = wordToIdMap.find(word);
-            if (value != null)
-                return value;
+    public Integer getOrCreateId(String word) throws IOException {
+        final var value = wordToIdMap.find(word);
+        if (value != null)
+            return value;
 
-            final var id = wordToIdMap.size() + 1;
-            wordToIdMap.insert(word, id);
-            idToWordMap.insert(id, word);
-            return id;
-        } catch (IOException e) {
-            throw new IndexerException(word, e);
-        }
+        final var id = wordToIdMap.size() + 1;
+        wordToIdMap.insert(word, id);
+        idToWordMap.insert(id, word);
+        return id;
     }
 
     public void printAll() throws IOException {

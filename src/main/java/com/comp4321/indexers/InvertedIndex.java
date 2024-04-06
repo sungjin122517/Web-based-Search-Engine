@@ -33,11 +33,11 @@ public class InvertedIndex {
 
     public InvertedIndex(PostingIndex titleIndex, PostingIndex bodyIndex,
             SafeBTree<Integer, Integer> docIdToTFMaxMap,
-            SafeBTree<Integer, Integer> wordIdToDfMap) {
+            SafeBTree<Integer, Integer> wordIdToDFMap) {
         this.titleIndex = titleIndex;
         this.bodyIndex = bodyIndex;
         this.docIdToTFMaxMap = docIdToTFMaxMap;
-        this.wordIdToDFMap = wordIdToDfMap;
+        this.wordIdToDFMap = wordIdToDFMap;
     }
 
     public InvertedIndex(RecordManager recman) throws IOException {
@@ -95,7 +95,7 @@ public class InvertedIndex {
      * @param docId    The ID of the document
      * @param titleId  The ID of the title
      * @param location The location of the title
-     * @throws IndexerException if an error occurs while adding the title to the
+     * @throws IOException if an error occurs while adding the title to the
      *                          index.
      */
     public void addTitle(Integer docId, Integer titleId, Integer location) throws IOException {
@@ -112,7 +112,7 @@ public class InvertedIndex {
      * @param docId    the ID of the document
      * @param wordId   the ID of the word
      * @param location the location of the word
-     * @throws IndexerException if an error occurs while adding the word to the
+     * @throws IOException if an error occurs while adding the word to the
      *                          index
      */
     public void addWord(Integer docId, Integer wordId, Integer location) throws IOException {
@@ -127,7 +127,7 @@ public class InvertedIndex {
      * Removes a document from the posting index.
      *
      * @param docId the ID of the document to be removed
-     * @throws IndexerException if an error occurs while removing the document
+     * @throws IOException if an error occurs while removing the document
      */
     public void removeDocument(Integer docId) throws IOException {
         // Retrieve all the word IDs for the document
@@ -147,6 +147,7 @@ public class InvertedIndex {
         docIdToTFMaxMap.remove(docId);
         totalWordIds.forEach(wordId -> {
             try {
+                // TODO: Just subtract 1 from the DF instead of recalculating it
                 updateDF(wordId);
             } catch (IOException e) {
                 throw new IndexerException("Error while updating DF", e);
@@ -204,7 +205,7 @@ public class InvertedIndex {
      *
      * @param wordIds the set of word IDs for which scores need to be calculated
      * @return a map of document IDs to their corresponding scores
-     * @throws IndexerException if an error occurs while calculating the scores
+     * @throws IOException if an error occurs while calculating the scores
      */
     public Map<Integer, Double> getScores(Set<Integer> wordIds) throws IOException {
 

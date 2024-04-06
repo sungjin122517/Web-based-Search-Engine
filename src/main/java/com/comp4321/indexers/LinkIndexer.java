@@ -25,40 +25,32 @@ public class LinkIndexer {
         this(new SafeHTree<>(recman, PARENT_TO_CHILD), new SafeHTree<>(recman, CHILD_TO_PARENT));
     }
 
-    private void addChildLink(int parent, int child) {
+    private void addChildLink(int parent, int child) throws IOException {
         if (parent == child)
             return;
 
         final var childKey = Integer.valueOf(child);
 
-        try {
-            var parentsValue = childToParentMap.get(childKey);
-            if (parentsValue == null)
-                parentsValue = new HashSet<Integer>();
+        var parentsValue = childToParentMap.get(childKey);
+        if (parentsValue == null)
+            parentsValue = new HashSet<Integer>();
 
-            parentsValue.add(parent);
-            childToParentMap.put(childKey, parentsValue);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("Parent: %d Child %d", parent, child), e);
-        }
+        parentsValue.add(parent);
+        childToParentMap.put(childKey, parentsValue);
     }
 
-    private void removeChildLink(int parent, int child) {
+    private void removeChildLink(int parent, int child) throws IOException {
         if (parent == child)
             return;
 
         final var childKey = Integer.valueOf(child);
 
-        try {
-            final var parentsValue = childToParentMap.get(childKey);
-            if (parentsValue == null)
-                return;
+        final var parentsValue = childToParentMap.get(childKey);
+        if (parentsValue == null)
+            return;
 
-            parentsValue.remove(parent);
-            childToParentMap.put(childKey, parentsValue);
-        } catch (IOException e) {
-            throw new IndexerException(String.format("Parent: %d Child %d", parent, child), e);
-        }
+        parentsValue.remove(parent);
+        childToParentMap.put(childKey, parentsValue);
     }
 
     /**
@@ -68,14 +60,16 @@ public class LinkIndexer {
      * @param docId The ID of the document.
      * @param links The set of links to be added.
      */
-    public void addLinks(int docId, Set<Integer> links) {
-        try {
-            removeLinks(docId);
-            parentToChildMap.put(Integer.valueOf(docId), links);
-            links.stream().forEach(child -> addChildLink(docId, child));
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId: %d", docId), e);
-        }
+    public void addLinks(int docId, Set<Integer> links) throws IOException {
+        removeLinks(docId);
+        parentToChildMap.put(Integer.valueOf(docId), links);
+        links.stream().forEach(child -> {
+            try {
+                addChildLink(docId, child);
+            } catch (IOException e) {
+                throw new IndexerException(String.format("DocId: %d", docId), e);
+            }
+        });
     }
 
     /**
@@ -83,18 +77,20 @@ public class LinkIndexer {
      *
      * @param docId the ID of the document whose links are to be removed
      */
-    public void removeLinks(int docId) {
-        try {
-            // Remove child links
-            final var oldLinks = parentToChildMap.get(Integer.valueOf(docId));
-            if (oldLinks != null)
-                oldLinks.stream().forEach(child -> removeChildLink(docId, child));
+    public void removeLinks(int docId) throws IOException {
+        // Remove child links
+        final var oldLinks = parentToChildMap.get(Integer.valueOf(docId));
+        if (oldLinks != null)
+            oldLinks.stream().forEach(child -> {
+                try {
+                    removeChildLink(docId, child);
+                } catch (IOException e) {
+                    throw new IndexerException(String.format("DocId: %d", docId), e);
+                }
+            });
 
-            // Remove parent link
-            parentToChildMap.remove(Integer.valueOf(docId));
-        } catch (IOException e) {
-            throw new IndexerException(String.format("DocId %d", docId), e);
-        }
+        // Remove parent link
+        parentToChildMap.remove(Integer.valueOf(docId));
     }
 
     public void printAll() throws IOException {
