@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.comp4321.indexers.IndexerException;
 import com.comp4321.jdbm.SafeHTree;
 
 public class PostingIndex {
@@ -30,8 +31,8 @@ public class PostingIndex {
     /**
      * Adds a word to the posting index.
      *
-     * @param docId The document ID.
-     * @param wordId The word ID.
+     * @param docId    The document ID.
+     * @param wordId   The word ID.
      * @param location The location of the word in the document.
      * @throws IOException If an I/O error occurs.
      */
@@ -112,8 +113,31 @@ public class PostingIndex {
      * @return the list of postings associated with the word ID
      * @throws IOException if an I/O error occurs while retrieving the postings
      */
-    public List<Posting> getPostings(Integer wordId) throws IOException{
+    public List<Posting> getPostings(Integer wordId) throws IOException {
         return invertedIndexMap.get(wordId);
+    }
+
+    /**
+     * Retrieves the posting associated with a given document ID and word ID.
+     * 
+     * @param docId  the ID of the document
+     * @param wordId the ID of the word
+     * @return the posting associated with the document ID and word ID
+     * @throws IOException if an I/O error occurs while retrieving the posting
+     * @throws IndexerException if the posting does not exist
+     */
+    public Posting getPosting(Integer docId, Integer wordId) throws IOException {
+        final var postings = getPostings(wordId);
+        if (postings == null)
+            throw new IndexerException(indexName + " Inverted Index does not contain word ID " + wordId);
+
+        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
+                Comparator.comparing(Posting::docId));
+        if (postingIdx < 0 || postingIdx >= postings.size())
+            throw new IndexerException(indexName + " Inverted Index does not contain posting for word ID " + wordId
+                    + " and document ID " + docId);
+
+        return postings.get(postingIdx);
     }
 
     public void printAll() throws IOException {

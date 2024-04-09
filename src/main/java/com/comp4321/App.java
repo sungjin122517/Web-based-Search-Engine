@@ -26,11 +26,14 @@ public class App {
                     break;
 
                 case "search":
+                    final var maxSearchResults = 50;
+
                     final var words = Arrays.stream(args).skip(1).collect(Collectors.toSet());
                     final var results = indexer.search(words, List.of());
                     results.entrySet().stream()
-                            .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
-                            .forEach(e -> System.out.println(e.getKey() + ": " + e.getValue()));
+                            .sorted((a, b) -> Double.compare(b.getValue().score(), a.getValue().score()))
+                            .limit(maxSearchResults)
+                            .forEach(entry -> System.out.println(entry.getValue().toResultFormat()));
                     break;
 
                 case "print":

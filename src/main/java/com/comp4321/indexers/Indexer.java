@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.Crawler;
+import com.comp4321.SearchResult;
 import com.comp4321.StopStem;
 import com.comp4321.IRUtilities.Porter;
 
@@ -186,14 +188,14 @@ public class Indexer implements AutoCloseable {
 
     /**
      * Searches for the given set of words and list of phrases in the index.
-     * Returns a map of URLs and their corresponding scores.
+     * Returns a map of docIds and their corresponding search results.
      *
      * @param words   the set of words to search for (words in phrases are included)
      * @param phrases the list of phrases to search for
-     * @return a map of URLs and their corresponding scores
+     * @return a map of docIds and their corresponding search results
      * @throws IOException if an I/O error occurs while searching the index
      */
-    public Map<String, Double> search(Set<String> words, List<List<String>> phrases) throws IOException {
+    public Map<Integer, SearchResult> search(Set<String> words, List<List<String>> phrases) throws IOException {
         // Compute the scores for the given words
         final var wordIds = words.stream().map(String::toLowerCase)
                 .filter(w -> !stopStem.isStopWord(w))
@@ -224,31 +226,52 @@ public class Indexer implements AutoCloseable {
         final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
 
         // Filter the scores with the documents with the given phrases
-        // and convert the document IDs to URLs
-        final var urlScores = scores.entrySet().stream()
+        // and convert to the search result
+        final var searchResults = scores.entrySet().stream()
                 .filter(entry -> documentsWithPhrases.contains(entry.getKey()))
-                .collect(Collectors.toMap(entry -> {
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     try {
-                        return urlIndexer.getURL(entry.getKey());
-                    } catch (IOException e) {
-                        throw new IndexerException("Failed to get URL", e);
-                    }
-                }, Map.Entry::getValue));
+                        final var docId = entry.getKey();
+                        final var score = entry.getValue();
 
-        /**
-         * TODO: Show the search results in following format:
-         * score page title
-         * url
-         * last modification date, size of page
-         * keyword 1 freq 1; keyword 2 freq 2; . . .
-         * Parent link 1
-         * Parent link 2
-         * ... ...
-         * Child link 1
-         * Child link 2
-         * ... ...
-         */
-        return urlScores;
+                        final var metadata = metadataIndexer.getMetadata(docId);
+                        final var url = urlIndexer.getURL(docId);
+
+                        final var keywordFrequencies = new HashMap<String, Integer>();
+                        invertedIndex.getKeywordsWithFrequency(docId).forEach((wordId, freq) -> {
+                            try {
+                                final var word = wordIndexer.getWord(wordId);
+                                keywordFrequencies.put(word, freq);
+                            } catch (IOException e) {
+                                throw new IndexerException("Failed to get word", e);
+                            }
+                        });
+
+                        final var parentLinks = linkIndexer.getParentLinks(docId).stream().map(parentId -> {
+                            try {
+                                return urlIndexer.getURL(parentId);
+                            } catch (IOException e) {
+                                throw new IndexerException("Failed to get URL", e);
+                            }
+                        }).collect(Collectors.toSet());
+
+                        final var childLinks = linkIndexer.getChildLinks(docId).stream().map(childId -> {
+                            try {
+                                return urlIndexer.getURL(childId);
+                            } catch (IOException e) {
+                                throw new IndexerException("Failed to get URL", e);
+                            }
+                        }).collect(Collectors.toSet());
+
+                        return new SearchResult(score, metadata.title(), url, metadata.lastModified(),
+                                metadata.pageSize(),
+                                keywordFrequencies, parentLinks, childLinks);
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get search result", e);
+                    }
+                }));
+
+        return searchResults;
     }
 
     /**

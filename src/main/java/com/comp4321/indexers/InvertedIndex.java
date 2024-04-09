@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.comp4321.indexers.posting.Posting;
@@ -96,7 +98,7 @@ public class InvertedIndex {
      * @param titleId  The ID of the title
      * @param location The location of the title
      * @throws IOException if an error occurs while adding the title to the
-     *                          index.
+     *                     index.
      */
     public void addTitle(Integer docId, Integer titleId, Integer location) throws IOException {
         titleIndex.addWord(docId, titleId, location);
@@ -113,7 +115,7 @@ public class InvertedIndex {
      * @param wordId   the ID of the word
      * @param location the location of the word
      * @throws IOException if an error occurs while adding the word to the
-     *                          index
+     *                     index
      */
     public void addWord(Integer docId, Integer wordId, Integer location) throws IOException {
         bodyIndex.addWord(docId, wordId, location);
@@ -208,6 +210,7 @@ public class InvertedIndex {
      * @throws IOException if an error occurs while calculating the scores
      */
     public Map<Integer, Double> getScores(Set<Integer> wordIds) throws IOException {
+        final var TITLE_MATCH_MULTIPLIER = 10;
 
         // Scores are calculated as (10 * title_tf + body_tf) * log(N / df) / tfMax
         // title_tf: term frequency in the title of the document
@@ -246,8 +249,7 @@ public class InvertedIndex {
 
                     var tf = 0;
                     if (titleDocId == docId) {
-                        // Multiply the term weight by 10 for title
-                        tf += titlePosting.locations().size() * 10;
+                        tf += titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
                         ++titleIdx;
                     }
 
@@ -261,7 +263,7 @@ public class InvertedIndex {
                 while (titleIdx < titlePostings.size()) {
                     final var titlePosting = titlePostings.get(titleIdx);
                     final var docId = titlePosting.docId();
-                    final var tf = titlePosting.locations().size() * 10; // See above for the multiplier
+                    final var tf = titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
                     final var tfMax = docIdToTFMaxMap.find(docId);
                     final var df = wordIdToDFMap.find(wordId);
                     final var idf = Math.log((double) totalDocuments / df);
@@ -310,6 +312,37 @@ public class InvertedIndex {
         for (final var entry : docIdToTFMaxMap)
             docIds.add(entry.getKey());
         return docIds;
+    }
+
+    /**
+     * Retrieves the keywords with their corresponding frequencies for a given
+     * document ID.
+     *
+     * @param docId The ID of the document.
+     * @return A map containing the wordIds as keys and their frequencies as values.
+     * @throws IOException If an I/O error occurs while retrieving the keywords and
+     *                     frequencies.
+     */
+    public Map<Integer, Integer> getKeywordsWithFrequency(Integer docId) throws IOException {
+        final var titleFrequencies = titleIndex.getForwardWords(docId)
+                .stream().collect(Collectors.toMap(Function.identity(), wordId -> {
+                    try {
+                        return titleIndex.getPosting(docId, wordId).locations().size();
+                    } catch (IOException e) {
+                        throw new IndexerException("Error while getting title postings", e);
+                    }
+                }));
+        final var bodyFrequencies = bodyIndex.getForwardWords(docId)
+                .stream().collect(Collectors.toMap(Function.identity(), wordId -> {
+                    try {
+                        return bodyIndex.getPosting(docId, wordId).locations().size();
+                    } catch (IOException e) {
+                        throw new IndexerException("Error while getting body postings", e);
+                    }
+                }));
+
+        return Stream.concat(titleFrequencies.entrySet().stream(), bodyFrequencies.entrySet().stream())
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum));
     }
 
     public void printAll() throws IOException {

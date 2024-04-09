@@ -93,6 +93,28 @@ public class LinkIndexer {
         parentToChildMap.remove(Integer.valueOf(docId));
     }
 
+    /**
+     * Retrieves the parent links for a given document ID.
+     *
+     * @param docId the document ID for which to retrieve the parent links
+     * @return a set of integers representing the parent links
+     * @throws IOException if an I/O error occurs while retrieving the parent links
+     */
+    public Set<Integer> getParentLinks(Integer docId) throws IOException {
+        return childToParentMap.get(docId);
+    }
+
+    /**
+     * Retrieves the child links associated with the given document ID.
+     *
+     * @param docId the document ID for which to retrieve the child links
+     * @return a set of integers representing the child links
+     * @throws IOException if an I/O error occurs while retrieving the child links
+     */
+    public Set<Integer> getChildLinks(Integer docId) throws IOException {
+        return parentToChildMap.get(docId);
+    }
+
     public void printAll() throws IOException {
         System.out.println("PARENT_TO_CHILD:");
         for (final var entry : parentToChildMap) {
