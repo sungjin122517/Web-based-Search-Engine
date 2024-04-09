@@ -1,6 +1,7 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.NoSuchElementException;
 
 import com.comp4321.jdbm.SafeBTree;
@@ -20,8 +21,8 @@ public class URLIndexer {
     }
 
     public URLIndexer(RecordManager recman) throws IOException {
-        this(new SafeBTree<>(recman, URL_TO_DOCID, String::compareTo),
-                new SafeBTree<>(recman, DOCID_TO_URL, Integer::compare));
+        this(new SafeBTree<>(recman, URL_TO_DOCID, Comparator.<String>naturalOrder()),
+                new SafeBTree<>(recman, DOCID_TO_URL, Comparator.<Integer>naturalOrder()));
     }
 
     /**

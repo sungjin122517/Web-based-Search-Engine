@@ -1,6 +1,7 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.Comparator;
 
 import com.comp4321.jdbm.SafeBTree;
 
@@ -19,8 +20,8 @@ public class WordIndexer {
     }
 
     public WordIndexer(RecordManager recman) throws IOException {
-        this(new SafeBTree<>(recman, WORD_TO_ID, String::compareTo),
-                new SafeBTree<>(recman, ID_TO_WORD, Integer::compare));
+        this(new SafeBTree<>(recman, WORD_TO_ID, Comparator.<String>naturalOrder()),
+                new SafeBTree<>(recman, ID_TO_WORD, Comparator.<Integer>naturalOrder()));
     }
 
     /**

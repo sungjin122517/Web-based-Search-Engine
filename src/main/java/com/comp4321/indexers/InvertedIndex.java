@@ -47,8 +47,8 @@ public class InvertedIndex {
                 new SafeHTree<>(recman, TITLEID_TO_POSTINGS)),
                 new PostingIndex("Body", new SafeHTree<>(recman, DOCID_TO_WORDSID),
                         new SafeHTree<>(recman, WORDSID_TO_POSTINGS)),
-                new SafeBTree<>(recman, DOCID_TO_TFMAX, Integer::compare),
-                new SafeBTree<>(recman, WORDID_TO_DF, Integer::compare));
+                new SafeBTree<>(recman, DOCID_TO_TFMAX, Comparator.<Integer>naturalOrder()),
+                new SafeBTree<>(recman, WORDID_TO_DF, Comparator.<Integer>naturalOrder()));
     }
 
     private void updateDF(Integer wordId) throws IOException {

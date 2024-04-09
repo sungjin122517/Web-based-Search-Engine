@@ -1,6 +1,7 @@
 package com.comp4321;
 
 import java.time.ZonedDateTime;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -61,7 +62,8 @@ public record SearchResult(Double score, String title, String url, ZonedDateTime
         sb.append('\n');
 
         sb.append('\t');
-        keywords().entrySet().stream().sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+        keywords().entrySet().stream()
+                .sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder()))
                 .limit(MAX_KEYWORD_COUNT)
                 .forEach(e -> {
                     sb.append(e.getKey());

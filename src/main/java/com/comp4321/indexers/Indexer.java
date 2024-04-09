@@ -47,7 +47,7 @@ public class Indexer implements AutoCloseable {
         invertedIndex = new InvertedIndex(recman);
     }
 
-    private boolean isFreshDocument(String url) throws IOException, ParserException {
+    private boolean isFreshDocument(String url) throws IOException {
         final var crawler = new Crawler(url);
         final var curLastModified = crawler.getLastModified();
 
