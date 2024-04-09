@@ -123,7 +123,7 @@ public class PostingIndex {
      * @param docId  the ID of the document
      * @param wordId the ID of the word
      * @return the posting associated with the document ID and word ID
-     * @throws IOException if an I/O error occurs while retrieving the posting
+     * @throws IOException      if an I/O error occurs while retrieving the posting
      * @throws IndexerException if the posting does not exist
      */
     public Posting getPosting(Integer docId, Integer wordId) throws IOException {
@@ -140,7 +140,7 @@ public class PostingIndex {
         return postings.get(postingIdx);
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         System.out.println(indexName + " Forward Index:");
         for (Map.Entry<Integer, Set<Integer>> entry : forwardIndexMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());

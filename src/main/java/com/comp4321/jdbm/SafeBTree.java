@@ -61,7 +61,7 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
                         cachedHasNext = browser.getNext(curTuple);
                         return cachedHasNext;
                     } catch (IOException e) {
-                        throw new RuntimeException(e);
+                        throw new JDBMException("Error while iterating over BTree", e);
                     }
                 }
 
@@ -94,7 +94,7 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
 
                         @Override
                         public boolean equals(Object obj) {
-                            if (obj == null || !(obj instanceof Entry))
+                            if (!(obj instanceof Entry))
                                 return false;
 
                             return getKey().equals(((Entry<?, ?>) obj).getKey())
@@ -110,7 +110,7 @@ public class SafeBTree<K, V> implements Iterable<Entry<K, V>> {
                 }
             };
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new JDBMException("Error while iterating over BTree", e);
         }
     }
 }

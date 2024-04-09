@@ -103,7 +103,7 @@ public class Indexer implements AutoCloseable {
                     try {
                         return wordIndexer.getOrCreateId(word);
                     } catch (IOException e) {
-                        throw new IndexerException("Failed to get or create word ID", e);
+                        throw new IndexerException("Failed to get or create word ID for title", e);
                     }
                 })
                 .toList();
@@ -111,7 +111,7 @@ public class Indexer implements AutoCloseable {
             try {
                 invertedIndex.addTitle(docId, titles.get(i), i);
             } catch (IOException e) {
-                throw new IndexerException("Failed to add title to inverted index", e);
+                throw new IndexerException("Failed to add title to inverted title index", e);
             }
         });
 
@@ -125,7 +125,7 @@ public class Indexer implements AutoCloseable {
                     try {
                         return wordIndexer.getOrCreateId(word);
                     } catch (IOException e) {
-                        throw new IndexerException("Failed to get or create word ID", e);
+                        throw new IndexerException("Failed to get or create word ID for body", e);
                     }
                 })
                 .toList();
@@ -133,7 +133,7 @@ public class Indexer implements AutoCloseable {
             try {
                 invertedIndex.addWord(docId, words.get(i), i);
             } catch (IOException e) {
-                throw new IndexerException("Failed to add word to inverted index", e);
+                throw new IndexerException("Failed to add word to inverted body index", e);
             }
         });
     }
@@ -186,6 +186,41 @@ public class Indexer implements AutoCloseable {
         }
     }
 
+    private SearchResult buildSearchResult(Integer docId, Double score) throws IOException {
+        final var metadata = metadataIndexer.getMetadata(docId);
+        final var url = urlIndexer.getURL(docId);
+
+        final var keywordFrequencies = new HashMap<String, Integer>();
+        invertedIndex.getKeywordsWithFrequency(docId).forEach((wordId, freq) -> {
+            try {
+                final var word = wordIndexer.getWord(wordId);
+                keywordFrequencies.put(word, freq);
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get word", e);
+            }
+        });
+
+        final var parentLinks = linkIndexer.getParentLinks(docId).stream().map(parentId -> {
+            try {
+                return urlIndexer.getURL(parentId);
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get URL", e);
+            }
+        }).collect(Collectors.toSet());
+
+        final var childLinks = linkIndexer.getChildLinks(docId).stream().map(childId -> {
+            try {
+                return urlIndexer.getURL(childId);
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get URL", e);
+            }
+        }).collect(Collectors.toSet());
+
+        return new SearchResult(score, metadata.title(), url, metadata.lastModified(),
+                metadata.pageSize(),
+                keywordFrequencies, parentLinks, childLinks);
+    }
+
     /**
      * Searches for the given set of words and list of phrases in the index.
      * Returns a map of docIds and their corresponding search results.
@@ -205,7 +240,7 @@ public class Indexer implements AutoCloseable {
                     try {
                         return wordIndexer.getOrCreateId(word);
                     } catch (IOException e) {
-                        throw new IndexerException("Failed to get or create word ID", e);
+                        throw new IndexerException("Failed to get or create word ID for query", e);
                     }
                 })
                 .collect(Collectors.toSet());
@@ -220,58 +255,22 @@ public class Indexer implements AutoCloseable {
                     try {
                         return wordIndexer.getOrCreateId(word);
                     } catch (IOException e) {
-                        throw new IndexerException("Failed to get or create word ID", e);
+                        throw new IndexerException("Failed to get or create word ID for phrase", e);
                     }
                 }).toList()).toList();
         final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
 
         // Filter the scores with the documents with the given phrases
         // and convert to the search result
-        final var searchResults = scores.entrySet().stream()
+        return scores.entrySet().stream()
                 .filter(entry -> documentsWithPhrases.contains(entry.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     try {
-                        final var docId = entry.getKey();
-                        final var score = entry.getValue();
-
-                        final var metadata = metadataIndexer.getMetadata(docId);
-                        final var url = urlIndexer.getURL(docId);
-
-                        final var keywordFrequencies = new HashMap<String, Integer>();
-                        invertedIndex.getKeywordsWithFrequency(docId).forEach((wordId, freq) -> {
-                            try {
-                                final var word = wordIndexer.getWord(wordId);
-                                keywordFrequencies.put(word, freq);
-                            } catch (IOException e) {
-                                throw new IndexerException("Failed to get word", e);
-                            }
-                        });
-
-                        final var parentLinks = linkIndexer.getParentLinks(docId).stream().map(parentId -> {
-                            try {
-                                return urlIndexer.getURL(parentId);
-                            } catch (IOException e) {
-                                throw new IndexerException("Failed to get URL", e);
-                            }
-                        }).collect(Collectors.toSet());
-
-                        final var childLinks = linkIndexer.getChildLinks(docId).stream().map(childId -> {
-                            try {
-                                return urlIndexer.getURL(childId);
-                            } catch (IOException e) {
-                                throw new IndexerException("Failed to get URL", e);
-                            }
-                        }).collect(Collectors.toSet());
-
-                        return new SearchResult(score, metadata.title(), url, metadata.lastModified(),
-                                metadata.pageSize(),
-                                keywordFrequencies, parentLinks, childLinks);
+                        return buildSearchResult(entry.getKey(), entry.getValue());
                     } catch (IOException e) {
-                        throw new IndexerException("Failed to get search result", e);
+                        throw new IndexerException("Failed to build search result", e);
                     }
                 }));
-
-        return searchResults;
     }
 
     /**

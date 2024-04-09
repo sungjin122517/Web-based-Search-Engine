@@ -1,15 +1,14 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.Comparator;
 
 import com.comp4321.jdbm.SafeBTree;
 
 import jdbm.RecordManager;
 
 public class WordIndexer {
-    public final static String WORD_TO_ID = "wordToId";
-    public final static String ID_TO_WORD = "idToWord";
+    public static final String WORD_TO_ID = "wordToId";
+    public static final String ID_TO_WORD = "idToWord";
 
     private final SafeBTree<String, Integer> wordToIdMap;
     private final SafeBTree<Integer, String> idToWordMap;
@@ -20,8 +19,8 @@ public class WordIndexer {
     }
 
     public WordIndexer(RecordManager recman) throws IOException {
-        this(new SafeBTree<String, Integer>(recman, WORD_TO_ID, Comparator.naturalOrder()),
-                new SafeBTree<Integer, String>(recman, ID_TO_WORD, Comparator.naturalOrder()));
+        this(new SafeBTree<>(recman, WORD_TO_ID, String::compareTo),
+                new SafeBTree<>(recman, ID_TO_WORD, Integer::compare));
     }
 
     /**
@@ -56,7 +55,7 @@ public class WordIndexer {
         return idToWordMap.find(id);
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         System.out.println("WORD_TO_ID:");
         for (final var entry : wordToIdMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue());

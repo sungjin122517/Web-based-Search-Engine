@@ -115,7 +115,7 @@ public class LinkIndexer {
         return parentToChildMap.get(docId);
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         System.out.println("PARENT_TO_CHILD:");
         for (final var entry : parentToChildMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue().toString());

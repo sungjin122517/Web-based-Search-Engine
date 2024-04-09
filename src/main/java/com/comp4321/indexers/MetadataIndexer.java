@@ -43,7 +43,7 @@ public class MetadataIndexer {
         metadataMap.put(docId, metadata);
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         System.out.println("DOCID_TO_METADATA:");
         for (final var entry : metadataMap) {
             System.out.println(entry.getKey() + " -> " + entry.getValue().toString());

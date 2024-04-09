@@ -16,8 +16,8 @@ import org.htmlparser.util.ParserException;
 public class Crawler {
     public final String url;
 
-    public Crawler(String _url) {
-        url = _url;
+    public Crawler(String url) {
+        this.url = url;
     }
 
     public List<String> extractWords() throws ParserException {
@@ -62,14 +62,14 @@ public class Crawler {
             return Arrays.asList(sb.getStrings().split(" "));
     }
 
-    public List<String> extractLinks() throws ParserException {
+    public List<String> extractLinks() {
         final var lb = new LinkBean();
         lb.setURL(url);
 
         return Arrays.stream(lb.getLinks()).map(URL::toString).toList();
     }
 
-    public ZonedDateTime getLastModified() throws ParserException {
+    public ZonedDateTime getLastModified() {
         final var lb = new LinkBean();
         lb.setURL(url);
 
@@ -83,7 +83,7 @@ public class Crawler {
         return ZonedDateTime.ofInstant(instant, ZoneId.of("GMT"));
     }
 
-    public long getPageSize() throws ParserException {
+    public long getPageSize() {
         final var sb = new StringBean();
         sb.setURL(url);
 

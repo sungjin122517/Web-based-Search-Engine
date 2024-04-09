@@ -11,8 +11,9 @@ import com.comp4321.indexers.Indexer;
 
 public class App {
     public static void main(String[] args) throws IOException {
+
         if (args.length == 0) {
-            System.out.println("Please provide an argument. Use 'crawl' or 'search <words>'");
+            System.err.println("Please provide an argument. Use 'crawl' or 'search <words>'");
             System.exit(1);
         }
 

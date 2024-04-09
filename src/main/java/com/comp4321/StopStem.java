@@ -6,7 +6,7 @@ import java.util.HashSet;
 import com.comp4321.IRUtilities.Porter;
 
 public class StopStem {
-	private final static String STOPWORDS_FILE = "stopwords.txt";
+	private static final String STOPWORDS_FILE = "stopwords.txt";
 
 	private Porter porter;
 	private HashSet<String> stopWords;
@@ -18,7 +18,7 @@ public class StopStem {
 	public StopStem(String str) {
 		super();
 		porter = new Porter();
-		stopWords = new HashSet<String>();
+		stopWords = new HashSet<>();
 
 		BufferedReader br = new BufferedReader(
 				new InputStreamReader(getClass().getClassLoader().getResourceAsStream(str)));

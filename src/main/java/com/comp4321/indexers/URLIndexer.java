@@ -1,7 +1,6 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.NoSuchElementException;
 
 import com.comp4321.jdbm.SafeBTree;
@@ -21,8 +20,8 @@ public class URLIndexer {
     }
 
     public URLIndexer(RecordManager recman) throws IOException {
-        this(new SafeBTree<String, Integer>(recman, URL_TO_DOCID, Comparator.naturalOrder()),
-                new SafeBTree<Integer, String>(recman, DOCID_TO_URL, Comparator.naturalOrder()));
+        this(new SafeBTree<>(recman, URL_TO_DOCID, String::compareTo),
+                new SafeBTree<>(recman, DOCID_TO_URL, Integer::compare));
     }
 
     /**
@@ -34,7 +33,7 @@ public class URLIndexer {
      * @param url The URL for which to retrieve or create a document ID.
      * @return The document ID associated with the URL.
      * @throws IOException If an error occurs while retrieving or creating the
-     *                          document ID.
+     *                     document ID.
      */
     public Integer getOrCreateDocumentId(String url) throws IOException {
         final var value = urlToDocIdMap.find(url);
@@ -53,7 +52,7 @@ public class URLIndexer {
      * @param docId The document ID for which to retrieve the URL.
      * @return The URL associated with the given document ID.
      * @throws NoSuchElementException If the document ID is not found in the index.
-     * @throws IOException       If an error occurs while retrieving the URL.
+     * @throws IOException            If an error occurs while retrieving the URL.
      */
     public String getURL(Integer docId) throws IOException {
         final var url = docIdToUrlMap.find(docId);
@@ -62,7 +61,7 @@ public class URLIndexer {
         return url;
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         System.out.println("URL_TO_DOCID:");
         for (final var urlTuple : urlToDocIdMap)
             System.out.println(urlTuple.getKey() + " -> " + urlTuple.getValue());

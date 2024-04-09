@@ -21,12 +21,12 @@ import com.comp4321.jdbm.SafeHTree;
 import jdbm.RecordManager;
 
 public class InvertedIndex {
-    public final static String DOCID_TO_TITLEID = "docIdToTitleId";
-    public final static String TITLEID_TO_POSTINGS = "titleIdToPostings";
-    public final static String DOCID_TO_WORDSID = "docIdToWordsId";
-    public final static String WORDSID_TO_POSTINGS = "wordsIdToPostings";
-    public final static String DOCID_TO_TFMAX = "docIdToTfMax";
-    public final static String WORDID_TO_DF = "wordIdToDf";
+    public static final String DOCID_TO_TITLEID = "docIdToTitleId";
+    public static final String TITLEID_TO_POSTINGS = "titleIdToPostings";
+    public static final String DOCID_TO_WORDSID = "docIdToWordsId";
+    public static final String WORDSID_TO_POSTINGS = "wordsIdToPostings";
+    public static final String DOCID_TO_TFMAX = "docIdToTfMax";
+    public static final String WORDID_TO_DF = "wordIdToDf";
 
     private final PostingIndex titleIndex;
     private final PostingIndex bodyIndex;
@@ -43,12 +43,12 @@ public class InvertedIndex {
     }
 
     public InvertedIndex(RecordManager recman) throws IOException {
-        this(new PostingIndex("Title", new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_TITLEID),
-                new SafeHTree<Integer, List<Posting>>(recman, TITLEID_TO_POSTINGS)),
-                new PostingIndex("Body", new SafeHTree<Integer, Set<Integer>>(recman, DOCID_TO_WORDSID),
-                        new SafeHTree<Integer, List<Posting>>(recman, WORDSID_TO_POSTINGS)),
-                new SafeBTree<Integer, Integer>(recman, DOCID_TO_TFMAX, Comparator.naturalOrder()),
-                new SafeBTree<Integer, Integer>(recman, WORDID_TO_DF, Comparator.naturalOrder()));
+        this(new PostingIndex("Title", new SafeHTree<>(recman, DOCID_TO_TITLEID),
+                new SafeHTree<>(recman, TITLEID_TO_POSTINGS)),
+                new PostingIndex("Body", new SafeHTree<>(recman, DOCID_TO_WORDSID),
+                        new SafeHTree<>(recman, WORDSID_TO_POSTINGS)),
+                new SafeBTree<>(recman, DOCID_TO_TFMAX, Integer::compare),
+                new SafeBTree<>(recman, WORDID_TO_DF, Integer::compare));
     }
 
     private void updateDF(Integer wordId) throws IOException {
@@ -149,8 +149,9 @@ public class InvertedIndex {
         docIdToTFMaxMap.remove(docId);
         totalWordIds.forEach(wordId -> {
             try {
-                // TODO: Just subtract 1 from the DF instead of recalculating it
-                updateDF(wordId);
+                // It is safe to just decrement the DF by 1 since the document is being removed
+                final var df = wordIdToDFMap.find(wordId) - 1;
+                wordIdToDFMap.insert(wordId, df);
             } catch (IOException e) {
                 throw new IndexerException("Error while updating DF", e);
             }
@@ -199,6 +200,81 @@ public class InvertedIndex {
         return Math.sqrt(docLen);
     }
 
+    private Map<Integer, Double> computeScoresForWord(Integer wordId) throws IOException {
+        // Scores are calculated as (TITLE_MATCH_MULTIPLIER * title_tf + body_tf) *
+        // log(N / df) / tfMax
+        // title_tf: term frequency in the title of the document
+        // body_tf: term frequency in the body of the document
+        // N: total number of documents
+        // df: document frequency of the term in either title or body
+        // tfMax: maximum (title_df + body_tf) in the document
+        final var scores = new HashMap<Integer, Double>();
+
+        final var TITLE_MATCH_MULTIPLIER = 10;
+        final var totalDocuments = docIdToTFMaxMap.size();
+
+        var titlePostings = titleIndex.getPostings(wordId);
+        if (titlePostings == null)
+            titlePostings = new ArrayList<>();
+
+        var bodyPostings = bodyIndex.getPostings(wordId);
+        if (bodyPostings == null)
+            bodyPostings = new ArrayList<>();
+
+        var titleIdx = 0;
+        var bodyIdx = 0;
+
+        // Iterate over the title and body postings and calculate the scores
+        while (titleIdx < titlePostings.size() && bodyIdx < bodyPostings.size()) {
+            final var titlePosting = titlePostings.get(titleIdx);
+            final var bodyPosting = bodyPostings.get(bodyIdx);
+
+            final var titleDocId = titlePosting.docId();
+            final var bodyDocId = bodyPosting.docId();
+
+            final var docId = Math.min(titleDocId, bodyDocId);
+            final var tfMax = docIdToTFMaxMap.find(docId);
+            final var df = wordIdToDFMap.find(wordId);
+            final var idf = Math.log((double) totalDocuments / df);
+
+            var tf = 0;
+            if (titleDocId == docId) {
+                tf += titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
+                ++titleIdx;
+            }
+
+            if (bodyDocId == docId) {
+                tf += bodyPosting.locations().size();
+                ++bodyIdx;
+            }
+            scores.merge(docId, tf * idf / tfMax, Double::sum);
+        }
+
+        while (titleIdx < titlePostings.size()) {
+            final var titlePosting = titlePostings.get(titleIdx);
+            final var docId = titlePosting.docId();
+            final var tf = titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
+            final var tfMax = docIdToTFMaxMap.find(docId);
+            final var df = wordIdToDFMap.find(wordId);
+            final var idf = Math.log((double) totalDocuments / df);
+            scores.merge(docId, tf * idf / tfMax, Double::sum);
+            ++titleIdx;
+        }
+
+        while (bodyIdx < bodyPostings.size()) {
+            final var bodyPosting = bodyPostings.get(bodyIdx);
+            final var docId = bodyPosting.docId();
+            final var tf = bodyPosting.locations().size();
+            final var tfMax = docIdToTFMaxMap.find(docId);
+            final var df = wordIdToDFMap.find(wordId);
+            final var idf = Math.log((double) totalDocuments / df);
+            scores.merge(docId, tf * idf / tfMax, Double::sum);
+            ++bodyIdx;
+        }
+
+        return scores;
+    }
+
     /**
      * Calculates the scores for a given set of word IDs.
      * Match in title is given priority by multiplying the term frequency in title
@@ -210,77 +286,13 @@ public class InvertedIndex {
      * @throws IOException if an error occurs while calculating the scores
      */
     public Map<Integer, Double> getScores(Set<Integer> wordIds) throws IOException {
-        final var TITLE_MATCH_MULTIPLIER = 10;
-
-        // Scores are calculated as (10 * title_tf + body_tf) * log(N / df) / tfMax
-        // title_tf: term frequency in the title of the document
-        // body_tf: term frequency in the body of the document
-        // N: total number of documents
-        // df: document frequency of the term in either title or body
-        // tfMax: maximum (title_df + body_tf) in the document
         final var scores = new HashMap<Integer, Double>();
 
-        final var totalDocuments = docIdToTFMaxMap.size();
+        // Calculate the scores for each word and merge them into the final scores
         wordIds.stream().forEach(wordId -> {
             try {
-                var titlePostings = titleIndex.getPostings(wordId);
-                if (titlePostings == null)
-                    titlePostings = new ArrayList<>();
-
-                var bodyPostings = bodyIndex.getPostings(wordId);
-                if (bodyPostings == null)
-                    bodyPostings = new ArrayList<>();
-
-                var titleIdx = 0;
-                var bodyIdx = 0;
-
-                // Iterate over the title and body postings and calculate the scores
-                while (titleIdx < titlePostings.size() && bodyIdx < bodyPostings.size()) {
-                    final var titlePosting = titlePostings.get(titleIdx);
-                    final var bodyPosting = bodyPostings.get(bodyIdx);
-
-                    final var titleDocId = titlePosting.docId();
-                    final var bodyDocId = bodyPosting.docId();
-
-                    final var docId = Math.min(titleDocId, bodyDocId);
-                    final var tfMax = docIdToTFMaxMap.find(docId);
-                    final var df = wordIdToDFMap.find(wordId);
-                    final var idf = Math.log((double) totalDocuments / df);
-
-                    var tf = 0;
-                    if (titleDocId == docId) {
-                        tf += titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
-                        ++titleIdx;
-                    }
-
-                    if (bodyDocId == docId) {
-                        tf += bodyPosting.locations().size();
-                        ++bodyIdx;
-                    }
-                    scores.merge(docId, tf * idf / tfMax, Double::sum);
-                }
-
-                while (titleIdx < titlePostings.size()) {
-                    final var titlePosting = titlePostings.get(titleIdx);
-                    final var docId = titlePosting.docId();
-                    final var tf = titlePosting.locations().size() * TITLE_MATCH_MULTIPLIER;
-                    final var tfMax = docIdToTFMaxMap.find(docId);
-                    final var df = wordIdToDFMap.find(wordId);
-                    final var idf = Math.log((double) totalDocuments / df);
-                    scores.merge(docId, tf * idf / tfMax, Double::sum);
-                    ++titleIdx;
-                }
-
-                while (bodyIdx < bodyPostings.size()) {
-                    final var bodyPosting = bodyPostings.get(bodyIdx);
-                    final var docId = bodyPosting.docId();
-                    final var tf = bodyPosting.locations().size();
-                    final var tfMax = docIdToTFMaxMap.find(docId);
-                    final var df = wordIdToDFMap.find(wordId);
-                    final var idf = Math.log((double) totalDocuments / df);
-                    scores.merge(docId, tf * idf / tfMax, Double::sum);
-                    ++bodyIdx;
-                }
+                final var wordScores = computeScoresForWord(wordId);
+                wordScores.forEach((docId, score) -> scores.merge(docId, score, Double::sum));
             } catch (IOException e) {
                 throw new IndexerException("Error while getting title postings", e);
             }
@@ -345,7 +357,7 @@ public class InvertedIndex {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum));
     }
 
-    public void printAll() throws IOException {
+    public void printAll() {
         titleIndex.printAll();
         bodyIndex.printAll();
 
