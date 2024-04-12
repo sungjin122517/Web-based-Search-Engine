@@ -116,14 +116,16 @@ public class Server {
                 .sorted(Comparator.comparing(entry -> entry.getValue().score(),
                         Comparator.reverseOrder()))
                 .limit(maxSearchResults)
-                .map(entry -> entry.getValue().toResultFormat())
-                .map(str -> "<li>" + str + "</li>")
+                .map(entry -> entry.getValue().toHTML())
                 .toList();
 
         try (final var html = getClass().getClassLoader().getResourceAsStream("result.html")) {
             final var response = new String(html.readAllBytes(), StandardCharsets.UTF_8);
-            final var responseBody = response.replace("{{target}}", String.join("",
-                    results)).getBytes();
+            final var responseBody = response.replace("{{target}}",
+                    results.isEmpty()
+                            ? "No results found"
+                            : String.join("", results))
+                    .getBytes();
 
             exchange.getResponseHeaders().set("Content-Type", "text/html");
             exchange.sendResponseHeaders(200, responseBody.length);
