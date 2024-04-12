@@ -16,6 +16,7 @@ import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.Crawler;
+import com.comp4321.SearchEngine;
 import com.comp4321.SearchResult;
 import com.comp4321.StopStem;
 import com.comp4321.IRUtilities.Porter;
@@ -25,7 +26,7 @@ import jdbm.RecordManagerFactory;
 import me.tongfei.progressbar.ProgressBarBuilder;
 import me.tongfei.progressbar.ProgressBarStyle;
 
-public class Indexer implements AutoCloseable {
+public class Indexer implements AutoCloseable, SearchEngine {
     private static final String DB_NAME = "indexes";
 
     private final RecordManager recman;
@@ -225,11 +226,13 @@ public class Indexer implements AutoCloseable {
      * Searches for the given set of words and phrase in the index.
      * Returns a map of docIds and their corresponding search results.
      *
-     * @param words   the set of words to search for (words in thephrase are included)
+     * @param words  the set of words to search for (words in thephrase are
+     *               included)
      * @param phrase the phrase to search for (if any)
      * @return a map of docIds and their corresponding search results
      * @throws IOException if an I/O error occurs while searching the index
      */
+    @Override
     public Map<Integer, SearchResult> search(Set<String> words, List<String> phrase) throws IOException {
         // Compute the scores for the given words
         final var wordIds = words.stream().map(String::toLowerCase)

@@ -12,20 +12,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.comp4321.indexers.Indexer;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 public class Server {
     private final ExecutorService executor;
     private final HttpServer httpServer;
-    private final Indexer indexer;
+    private final SearchEngine indexer;
     private final int maxSearchResults;
 
     public static final String SEARCH_PATH = "/";
     public static final String RESULT_PATH = "/result";
 
-    public Server(Indexer indexer, int maxSearchResults) throws IOException {
+    public Server(SearchEngine indexer, int maxSearchResults) throws IOException {
         this.executor = Executors.newSingleThreadExecutor();
         this.httpServer = HttpServer.create(new InetSocketAddress(0), 5);
         this.indexer = indexer;

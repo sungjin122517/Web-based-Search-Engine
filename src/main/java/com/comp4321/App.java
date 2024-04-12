@@ -29,7 +29,6 @@ public class App {
                     break;
 
                 case "search":
-
                     final var words = Arrays.stream(args).skip(1).collect(Collectors.toSet());
                     final var results = indexer.search(words, List.of());
                     results.entrySet().stream()
