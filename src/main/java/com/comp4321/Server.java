@@ -91,17 +91,25 @@ public class Server {
         }
 
         // Parse query and collect search keywords
-        // TODO: Parse phrase search keywords
-        final var queryList = Pattern.compile("\\s*&\\s*")
+        final var searchText = Pattern.compile("\\s*&\\s*")
                 .splitAsStream(query)
                 .map(s -> s.split("=", 2))
                 .collect(Collectors.toMap(param -> param[0], param -> param.length > 1 ? param[1] : "",
-                        (x, y) -> String.join(" ", x, y)));
+                        (x, y) -> String.join(" ", x, y)))
+                .getOrDefault("search", "");
+
         final var keywords = Arrays.stream(
-                queryList.getOrDefault("search",
-                        "").split("[^a-zA-Z0-9_-]+"))
+                searchText.split("[^a-zA-Z0-9_-]+"))
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.toSet());
+
+        final var phraseText = Pattern.compile("\"(.*)\"")
+                .matcher(searchText);
+        final var phrase = phraseText.matches()
+                ? Arrays.stream(phraseText.group(1).split("[^a-zA-Z0-9_-]+"))
+                        .filter(s -> !s.isBlank())
+                        .collect(Collectors.toList())
+                : List.<String>of();
 
         // Reject if no keywords
         if (keywords.isEmpty()) {
@@ -112,7 +120,7 @@ public class Server {
             return;
         }
 
-        final var results = indexer.search(keywords, List.of()).entrySet().stream()
+        final var results = indexer.search(keywords, phrase).entrySet().stream()
                 .sorted(Comparator.comparing(entry -> entry.getValue().score(),
                         Comparator.reverseOrder()))
                 .limit(maxSearchResults)
