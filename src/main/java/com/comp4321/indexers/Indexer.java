@@ -222,15 +222,15 @@ public class Indexer implements AutoCloseable {
     }
 
     /**
-     * Searches for the given set of words and list of phrases in the index.
+     * Searches for the given set of words and phrase in the index.
      * Returns a map of docIds and their corresponding search results.
      *
-     * @param words   the set of words to search for (words in phrases are included)
-     * @param phrases the list of phrases to search for
+     * @param words   the set of words to search for (words in thephrase are included)
+     * @param phrase the phrase to search for (if any)
      * @return a map of docIds and their corresponding search results
      * @throws IOException if an I/O error occurs while searching the index
      */
-    public Map<Integer, SearchResult> search(Set<String> words, List<List<String>> phrases) throws IOException {
+    public Map<Integer, SearchResult> search(Set<String> words, List<String> phrase) throws IOException {
         // Compute the scores for the given words
         final var wordIds = words.stream().map(String::toLowerCase)
                 .filter(w -> !stopStem.isStopWord(w))
@@ -246,8 +246,8 @@ public class Indexer implements AutoCloseable {
                 .collect(Collectors.toSet());
         final var scores = invertedIndex.getScores(wordIds);
 
-        // Get the documents with the given phrases
-        final var phraseIds = phrases.stream().map(phrase -> phrase.stream().map(String::toLowerCase)
+        // Get the documents with the given phrase
+        final var phraseIds = phrase.stream().map(String::toLowerCase)
                 .filter(w -> !stopStem.isStopWord(w))
                 .map(porter::stripAffixes)
                 .filter(w -> !w.isBlank())
@@ -257,13 +257,13 @@ public class Indexer implements AutoCloseable {
                     } catch (IOException e) {
                         throw new IndexerException("Failed to get or create word ID for phrase", e);
                     }
-                }).toList()).toList();
-        final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
+                }).toList();
+        final var documentsWithPhrase = invertedIndex.getDocumentsWithPhrase(phraseIds);
 
-        // Filter the scores with the documents with the given phrases
+        // Filter the scores with the documents with the given phrase
         // and convert to the search result
         return scores.entrySet().stream()
-                .filter(entry -> documentsWithPhrases.contains(entry.getKey()))
+                .filter(entry -> documentsWithPhrase.contains(entry.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     try {
                         return buildSearchResult(entry.getKey(), entry.getValue());

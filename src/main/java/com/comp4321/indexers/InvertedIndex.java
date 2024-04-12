@@ -311,13 +311,12 @@ public class InvertedIndex {
     }
 
     /**
-     * Returns a set of document IDs that contain the given phrases.
+     * Returns a set of document IDs that contain the given phrase.
      *
-     * @param phrases a list of phrases, where each phrase is represented as a list
-     *                of word IDs
-     * @return a set of document IDs that contain the given phrases
+     * @param phrase a phrase represented as an ordered list of word IDs
+     * @return a set of document IDs that contain the given phrase
      */
-    public Set<Integer> getDocumentsWithPhrases(List<List<Integer>> phrases) {
+    public Set<Integer> getDocumentsWithPhrase(List<Integer> phrase) {
         // TODO: Implement this method
         // It currently returns all the documents
         final var docIds = new HashSet<Integer>();
