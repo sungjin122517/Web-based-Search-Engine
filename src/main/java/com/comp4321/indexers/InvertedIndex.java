@@ -328,8 +328,10 @@ public class InvertedIndex {
         final var titlePhrase = titleIndex.getDocumentsWithPhrase(phrase);
         final var bodyPhrase = bodyIndex.getDocumentsWithPhrase(phrase);
 
-        titlePhrase.addAll(bodyPhrase);
-        return titlePhrase;
+        final var docIds = new HashSet<Integer>();
+        docIds.addAll(titlePhrase);
+        docIds.addAll(bodyPhrase);
+        return docIds;
     }
 
     /**

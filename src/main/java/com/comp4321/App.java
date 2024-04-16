@@ -37,6 +37,15 @@ public class App {
                             .forEach(entry -> System.out.println(entry.getValue().toResultFormat()));
                     break;
 
+                case "phrase":
+                    final var phrase = Arrays.stream(args).skip(1).collect(Collectors.toList());
+                    final var phraseResults = indexer.search(phrase.stream().collect(Collectors.toSet()), phrase);
+                    phraseResults.entrySet().stream()
+                            .sorted(Comparator.comparing(entry -> entry.getValue().score(), Comparator.reverseOrder()))
+                            .limit(maxSearchResults)
+                            .forEach(entry -> System.out.println(entry.getValue().toResultFormat()));
+                    break;
+
                 case "server":
                     final var server = new Server(indexer, maxSearchResults);
                     server.start();
