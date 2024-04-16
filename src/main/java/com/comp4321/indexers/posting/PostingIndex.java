@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.comp4321.indexers.IndexerException;
 import com.comp4321.jdbm.SafeHTree;
@@ -138,6 +139,54 @@ public class PostingIndex {
                     + " and document ID " + docId);
 
         return postings.get(postingIdx);
+    }
+
+    /**
+     * Retrieves the set of documents that contain the given phrase.
+     *
+     * @param phrase the list of integers representing the phrase
+     * @return a set of integers representing the document IDs that contain the phrase
+     * @throws IOException if an I/O error occurs while retrieving the postings
+     */
+    public Set<Integer> getDocumentsWithPhrase(List<Integer> phrase) throws IOException {
+        if (phrase.isEmpty())
+            return Set.of();
+
+        var prevPostings = getPostings(phrase.get(0));
+        for (int i = 1; i < phrase.size(); ++i) {
+            final var newPostings = new ArrayList<Posting>();
+            final var curPostings = getPostings(phrase.get(i));
+
+            var prevIdx = 0;
+            var curIdx = 0;
+            while (prevIdx < prevPostings.size() && curIdx < curPostings.size()) {
+                final var prevPosting = prevPostings.get(prevIdx);
+                final var curPosting = curPostings.get(curIdx);
+
+                if (prevPosting.docId() < curPosting.docId()) {
+                    ++prevIdx;
+                } else if (prevPosting.docId() > curPosting.docId()) {
+                    ++curIdx;
+                } else {
+                    final var docId = prevPosting.docId();
+                    final var newLocations = prevPosting.locations()
+                            .stream()
+                            .map(loc -> loc + 1)
+                            .collect(Collectors.toSet());
+                    newLocations.retainAll(curPosting.locations());
+
+                    if (!newLocations.isEmpty())
+                        newPostings.add(new Posting(docId, newLocations));
+
+                    ++prevIdx;
+                    ++curIdx;
+                }
+            }
+
+            prevPostings = newPostings;
+        }
+
+        return prevPostings.stream().map(Posting::docId).collect(Collectors.toSet());
     }
 
     public void printAll() {
