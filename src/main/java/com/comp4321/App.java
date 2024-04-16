@@ -47,7 +47,7 @@ public class App {
                     break;
 
                 case "server":
-                    final var server = new Server(indexer, maxSearchResults);
+                    final var server = new JavalinServer();
                     server.start();
                     break;
 
