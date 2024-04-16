@@ -1,4 +1,4 @@
-package com.comp4321;
+package com.comp4321.IRUtilities;
 
 import java.net.URL;
 import java.time.Instant;

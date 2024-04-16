@@ -311,18 +311,26 @@ public class InvertedIndex {
     }
 
     /**
-     * Returns a set of document IDs that contain the given phrases.
+     * Returns a set of document IDs that contain the given phrase.
      *
-     * @param phrases a list of phrases, where each phrase is represented as a list
-     *                of word IDs
-     * @return a set of document IDs that contain the given phrases
+     * @param phrase a phrase represented as an ordered list of word IDs
+     * @return a set of document IDs that contain the given phrase
      */
-    public Set<Integer> getDocumentsWithPhrases(List<List<Integer>> phrases) {
-        // TODO: Implement this method
-        // It currently returns all the documents
+    public Set<Integer> getDocumentsWithPhrase(List<Integer> phrase) throws IOException {
+        // Returns all the documents
+        if (phrase.isEmpty()) {
+            final var docIds = new HashSet<Integer>();
+            for (final var entry : docIdToTFMaxMap)
+                docIds.add(entry.getKey());
+            return docIds;
+        }
+
+        final var titlePhrase = titleIndex.getDocumentsWithPhrase(phrase);
+        final var bodyPhrase = bodyIndex.getDocumentsWithPhrase(phrase);
+
         final var docIds = new HashSet<Integer>();
-        for (final var entry : docIdToTFMaxMap)
-            docIds.add(entry.getKey());
+        docIds.addAll(titlePhrase);
+        docIds.addAll(bodyPhrase);
         return docIds;
     }
 

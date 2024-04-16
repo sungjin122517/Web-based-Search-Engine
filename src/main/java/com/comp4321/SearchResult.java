@@ -8,6 +8,9 @@ import java.util.Set;
 
 public record SearchResult(Double score, String title, String url, ZonedDateTime lastModified, Long pageSize,
         Map<String, Integer> keywords, Set<String> parentLinks, Set<String> childLinks) {
+
+    public static final Integer MAX_KEYWORD_COUNT = 5;
+
     public SearchResult {
         Objects.requireNonNull(score);
         Objects.requireNonNull(title);
@@ -23,13 +26,24 @@ public record SearchResult(Double score, String title, String url, ZonedDateTime
     }
 
     /**
+     * Returns a string representation of the top keywords and their frequencies.
+     *
+     * @return a string containing the top keywords and their frequencies
+     */
+    public String topKeywordsToString() {
+        return keywords().entrySet().stream()
+                .sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder()))
+                .limit(MAX_KEYWORD_COUNT)
+                .map(e -> e.getKey() + " " + e.getValue() + "; ")
+                .reduce("", String::concat);
+    }
+
+    /**
      * Converts the search result object to a formatted string representation.
      *
      * @return The formatted string representation of the search result.
      */
     public String toResultFormat() {
-        final var MAX_KEYWORD_COUNT = 5;
-
         /*
          * score title
          * url
@@ -44,22 +58,6 @@ public record SearchResult(Double score, String title, String url, ZonedDateTime
          */
 
         final var sb = new StringBuilder();
-
-        sb.append(String.format("%.4f", score));
-        sb.append('\t');
-
-        sb.append(title);
-        sb.append('\n');
-
-        sb.append('\t');
-        sb.append(url);
-        sb.append('\n');
-
-        sb.append('\t');
-        sb.append(lastModified);
-        sb.append(", ");
-        sb.append(pageSize);
-        sb.append('\n');
 
         sb.append('\t');
         keywords().entrySet().stream()

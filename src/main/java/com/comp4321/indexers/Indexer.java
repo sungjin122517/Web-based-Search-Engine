@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -15,17 +16,18 @@ import java.util.stream.IntStream;
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
-import com.comp4321.Crawler;
+import com.comp4321.IRUtilities.Crawler;
+import com.comp4321.SearchEngine;
 import com.comp4321.SearchResult;
-import com.comp4321.StopStem;
 import com.comp4321.IRUtilities.Porter;
+import com.comp4321.IRUtilities.StopStem;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;
 import me.tongfei.progressbar.ProgressBarBuilder;
 import me.tongfei.progressbar.ProgressBarStyle;
 
-public class Indexer implements AutoCloseable {
+public class Indexer implements AutoCloseable, SearchEngine {
     private static final String DB_NAME = "indexes";
 
     private final RecordManager recman;
@@ -55,6 +57,26 @@ public class Indexer implements AutoCloseable {
         final var metadata = metadataIndexer.getMetadata(docId);
 
         return metadata == null || curLastModified.isAfter(metadata.lastModified());
+    }
+
+    /**
+        * Stems a word by converting it to lowercase, removing any affixes using Porter's algorithm,
+        * and checking if it is a stop word.
+        *
+        * @param word the word to be stemmed
+        * @return an Optional containing the stemmed word if it is not a stop word and not blank,
+        *         or an empty Optional otherwise
+        */
+    public Optional<String> stemWord(String word) {
+        word = word.toLowerCase();
+        if (stopStem.isStopWord(word))
+            return Optional.empty();
+
+        word = porter.stripAffixes(word);
+        if (word.isBlank())
+            return Optional.empty();
+
+        return Optional.of(word);
     }
 
     /**
@@ -95,10 +117,8 @@ public class Indexer implements AutoCloseable {
         // Add title and words to word index
         final var titles = crawler.extractTitle(true)
                 .stream()
-                .map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -117,10 +137,8 @@ public class Indexer implements AutoCloseable {
 
         final var words = crawler.extractWords()
                 .stream()
-                .map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -222,20 +240,21 @@ public class Indexer implements AutoCloseable {
     }
 
     /**
-     * Searches for the given set of words and list of phrases in the index.
+     * Searches for the given set of words and phrase in the index.
      * Returns a map of docIds and their corresponding search results.
      *
-     * @param words   the set of words to search for (words in phrases are included)
-     * @param phrases the list of phrases to search for
+     * @param words  the set of words to search for (words in thephrase are
+     *               included)
+     * @param phrase the phrase to search for (if any)
      * @return a map of docIds and their corresponding search results
      * @throws IOException if an I/O error occurs while searching the index
      */
-    public Map<Integer, SearchResult> search(Set<String> words, List<List<String>> phrases) throws IOException {
+    @Override
+    public Map<Integer, SearchResult> search(Set<String> words, List<String> phrase) throws IOException {
         // Compute the scores for the given words
-        final var wordIds = words.stream().map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+        final var wordIds = words.stream()
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -246,24 +265,23 @@ public class Indexer implements AutoCloseable {
                 .collect(Collectors.toSet());
         final var scores = invertedIndex.getScores(wordIds);
 
-        // Get the documents with the given phrases
-        final var phraseIds = phrases.stream().map(phrase -> phrase.stream().map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+        // Get the documents with the given phrase
+        final var phraseIds = phrase.stream()
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
                     } catch (IOException e) {
                         throw new IndexerException("Failed to get or create word ID for phrase", e);
                     }
-                }).toList()).toList();
-        final var documentsWithPhrases = invertedIndex.getDocumentsWithPhrases(phraseIds);
+                }).toList();
+        final var documentsWithPhrase = invertedIndex.getDocumentsWithPhrase(phraseIds);
 
-        // Filter the scores with the documents with the given phrases
+        // Filter the scores with the documents with the given phrase
         // and convert to the search result
         return scores.entrySet().stream()
-                .filter(entry -> documentsWithPhrases.contains(entry.getKey()))
+                .filter(entry -> documentsWithPhrase.contains(entry.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     try {
                         return buildSearchResult(entry.getKey(), entry.getValue());
