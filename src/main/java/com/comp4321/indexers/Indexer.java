@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -59,6 +60,26 @@ public class Indexer implements AutoCloseable, SearchEngine {
     }
 
     /**
+        * Stems a word by converting it to lowercase, removing any affixes using Porter's algorithm,
+        * and checking if it is a stop word.
+        *
+        * @param word the word to be stemmed
+        * @return an Optional containing the stemmed word if it is not a stop word and not blank,
+        *         or an empty Optional otherwise
+        */
+    public Optional<String> stemWord(String word) {
+        word = word.toLowerCase();
+        if (stopStem.isStopWord(word))
+            return Optional.empty();
+
+        word = porter.stripAffixes(word);
+        if (word.isBlank())
+            return Optional.empty();
+
+        return Optional.of(word);
+    }
+
+    /**
      * Indexes a document by crawling the given URL, extracting metadata, links,
      * title, and words, and adding them to the respective indexes.
      *
@@ -96,10 +117,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
         // Add title and words to word index
         final var titles = crawler.extractTitle(true)
                 .stream()
-                .map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -118,10 +137,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
 
         final var words = crawler.extractWords()
                 .stream()
-                .map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -235,10 +252,9 @@ public class Indexer implements AutoCloseable, SearchEngine {
     @Override
     public Map<Integer, SearchResult> search(Set<String> words, List<String> phrase) throws IOException {
         // Compute the scores for the given words
-        final var wordIds = words.stream().map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+        final var wordIds = words.stream()
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);
@@ -250,10 +266,9 @@ public class Indexer implements AutoCloseable, SearchEngine {
         final var scores = invertedIndex.getScores(wordIds);
 
         // Get the documents with the given phrase
-        final var phraseIds = phrase.stream().map(String::toLowerCase)
-                .filter(w -> !stopStem.isStopWord(w))
-                .map(porter::stripAffixes)
-                .filter(w -> !w.isBlank())
+        final var phraseIds = phrase.stream()
+                .map(this::stemWord)
+                .flatMap(Optional::stream)
                 .map(word -> {
                     try {
                         return wordIndexer.getOrCreateId(word);

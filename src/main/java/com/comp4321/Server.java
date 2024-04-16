@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -50,12 +51,21 @@ public class Server {
 
     private void handler(HttpExchange exchange) throws IOException {
         final var path = exchange.getRequestURI().getPath();
-        if (path.equals(SEARCH_PATH))
-            searchHandler(exchange);
-        else if (path.equals(RESULT_PATH))
-            resultHandler(exchange);
-        else
-            catchAllHandler(exchange);
+        try {
+            if (path.equals(SEARCH_PATH))
+                searchHandler(exchange);
+            else if (path.equals(RESULT_PATH))
+                resultHandler(exchange);
+            else
+                catchAllHandler(exchange);
+        } catch (Exception e) {
+            final var pw = new java.io.PrintWriter(new java.io.StringWriter());
+            e.printStackTrace(pw);
+            final var error = "500 Internal Server Error\n" + pw.toString();
+            exchange.sendResponseHeaders(500, error.length());
+            exchange.getResponseBody().write(error.getBytes());
+            exchange.close();
+        }
     }
 
     private void catchAllHandler(HttpExchange exchange) throws IOException {
@@ -102,9 +112,8 @@ public class Server {
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.toSet());
 
-        final var phraseText = Pattern.compile("\"(.*)\"")
-                .matcher(searchText);
-        final var phrase = phraseText.matches()
+        final var phraseText = Pattern.compile("\"(.*)\"").matcher(searchText);
+        final var phrase = phraseText.find()
                 ? Arrays.stream(phraseText.group(1).split("[^a-zA-Z0-9_-]+"))
                         .filter(s -> !s.isBlank())
                         .collect(Collectors.toList())
@@ -127,11 +136,23 @@ public class Server {
                 .toList();
 
         try (final var html = getClass().getClassLoader().getResourceAsStream("result.html")) {
+            final var stemmedKeywords = keywords.stream()
+                    .map(indexer::stemWord)
+                    .flatMap(Optional::stream)
+                    .collect(Collectors.toSet());
+            final var stemmedPhrase = phrase.stream()
+                    .map(indexer::stemWord)
+                    .flatMap(Optional::stream)
+                    .collect(Collectors.toList());
+
             final var response = new String(html.readAllBytes(), StandardCharsets.UTF_8);
-            final var responseBody = response.replace("{{target}}",
-                    results.isEmpty()
-                            ? "No results found"
-                            : String.join("", results))
+            final var responseBody = response
+                    .replace("{{keywords}}", String.join(" ", stemmedKeywords))
+                    .replace("{{phrase}}", String.join(" ", stemmedPhrase))
+                    .replace("{{target}}",
+                            results.isEmpty()
+                                    ? "No results found"
+                                    : String.join("", results))
                     .getBytes();
 
             exchange.getResponseHeaders().set("Content-Type", "text/html");
