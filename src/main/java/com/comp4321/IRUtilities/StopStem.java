@@ -1,9 +1,8 @@
-package com.comp4321;
+package com.comp4321.IRUtilities;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.util.HashSet;
-
-import com.comp4321.IRUtilities.Porter;
 
 public class StopStem {
 	private static final String STOPWORDS_FILE = "stopwords.txt";

@@ -16,11 +16,11 @@ import java.util.stream.IntStream;
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
-import com.comp4321.Crawler;
+import com.comp4321.IRUtilities.Crawler;
 import com.comp4321.SearchEngine;
 import com.comp4321.SearchResult;
-import com.comp4321.StopStem;
 import com.comp4321.IRUtilities.Porter;
+import com.comp4321.IRUtilities.StopStem;
 
 import jdbm.RecordManager;
 import jdbm.RecordManagerFactory;

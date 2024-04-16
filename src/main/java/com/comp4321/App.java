@@ -9,12 +9,13 @@ import java.util.stream.Collectors;
 import org.htmlparser.util.ParserException;
 
 import com.comp4321.indexers.Indexer;
+import com.comp4321.server.JavalinServer;
 
 public class App {
     public static void main(String[] args) throws IOException {
 
         if (args.length == 0) {
-            System.err.println("Please provide an argument. Use 'crawl' or 'search <words>' or 'server'");
+            System.err.println("Please provide an argument. Use 'crawl' or 'server'");
             System.exit(1);
         }
 
@@ -47,8 +48,9 @@ public class App {
                     break;
 
                 case "server":
-                    final var server = new JavalinServer();
+                    final var server = new JavalinServer(indexer, maxSearchResults);
                     server.start();
+                    server.awaitTermination();
                     break;
 
                 case "print":
@@ -56,13 +58,15 @@ public class App {
                     break;
 
                 default:
-                    System.out.println("Unknown argument. Use 'crawl' or 'search <words>'");
+                    System.out.println("Unknown argument. Use 'crawl' or 'server'");
                     System.exit(1);
             }
         } catch (IOException | ParserException e) {
             System.err.println("An error occurred: " + e.getMessage());
             e.printStackTrace();
             System.exit(1);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 }
