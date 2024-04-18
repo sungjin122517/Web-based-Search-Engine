@@ -215,24 +215,19 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs while retrieving the postings
      */
     public Set<Integer> getDocumentsWithPhrase(List<Integer> phrase) throws IOException {
-        if (phrase.isEmpty())
-            return Set.of();
-
-        final var postings = phrase.stream().map(wordId -> {
-            try {
-                return getPostings(wordId);
-            } catch (IOException e) {
-                throw new IndexerException("An error occurred while retrieving postings for word ID " + wordId, e);
-            }
-        }).collect(Collectors.toList());
-        if (postings.contains(null))
-            return Set.of();
-
-        var prevPostings = postings.get(0);
-        for (int i = 1; i < phrase.size(); ++i)
-            prevPostings = mergePhrase(prevPostings, postings.get(i));
-
-        return prevPostings.stream().map(Posting::docId).collect(Collectors.toSet());
+        return phrase.stream()
+                .map(wordId -> {
+                    try {
+                        return getPostings(wordId);
+                    } catch (IOException e) {
+                        throw new IndexerException("An error occurred while retrieving postings", e);
+                    }
+                })
+                .reduce(this::mergePhrase)
+                .stream()
+                .flatMap(List::stream)
+                .map(Posting::docId)
+                .collect(Collectors.toSet());
     }
 
     public void printAll() {
