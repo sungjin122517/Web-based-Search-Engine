@@ -8,6 +8,11 @@
 </head>
 
 <body>
+    <form action="/result">
+    <input type="text" name="search" placeholder="Enter your search query">
+    <input type="submit" value="Search">
+    </form>
+
     <h1>Search Results</h1>
     <h4>Search keywords: ${page.keywords().toString()}</h4>
     <h4>Search phrase: ${page.phrase().toString()}</h4>
