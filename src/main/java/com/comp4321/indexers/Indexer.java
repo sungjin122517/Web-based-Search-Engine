@@ -60,13 +60,15 @@ public class Indexer implements AutoCloseable, SearchEngine {
     }
 
     /**
-        * Stems a word by converting it to lowercase, removing any affixes using Porter's algorithm,
-        * and checking if it is a stop word.
-        *
-        * @param word the word to be stemmed
-        * @return an Optional containing the stemmed word if it is not a stop word and not blank,
-        *         or an empty Optional otherwise
-        */
+     * Stems a word by converting it to lowercase, removing any affixes using
+     * Porter's algorithm,
+     * and checking if it is a stop word.
+     *
+     * @param word the word to be stemmed
+     * @return an Optional containing the stemmed word if it is not a stop word and
+     *         not blank,
+     *         or an empty Optional otherwise
+     */
     public Optional<String> stemWord(String word) {
         word = word.toLowerCase();
         if (stopStem.isStopWord(word))
@@ -265,7 +267,7 @@ public class Indexer implements AutoCloseable, SearchEngine {
                 .collect(Collectors.toSet());
         final var scores = invertedIndex.getScores(wordIds);
 
-        // Get the documents with the given phrase
+        // Get the documents with the given phrase if the phrase is not empty
         final var phraseIds = phrase.stream()
                 .map(this::stemWord)
                 .flatMap(Optional::stream)
@@ -276,7 +278,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
                         throw new IndexerException("Failed to get or create word ID for phrase", e);
                     }
                 }).toList();
-        final var documentsWithPhrase = invertedIndex.getDocumentsWithPhrase(phraseIds);
+        final var documentsWithPhrase = phraseIds.isEmpty() ? scores.keySet()
+                : invertedIndex.getDocumentsWithPhrase(phraseIds);
 
         // Filter the scores with the documents with the given phrase
         // and convert to the search result
