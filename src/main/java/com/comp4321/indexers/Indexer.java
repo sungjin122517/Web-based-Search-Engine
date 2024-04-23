@@ -11,14 +11,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
-import com.comp4321.IRUtilities.Crawler;
 import com.comp4321.SearchEngine;
 import com.comp4321.SearchResult;
+import com.comp4321.IRUtilities.Crawler;
 import com.comp4321.IRUtilities.Porter;
 import com.comp4321.IRUtilities.StopStem;
 
@@ -49,16 +48,6 @@ public class Indexer implements AutoCloseable, SearchEngine {
         invertedIndex = new InvertedIndex(recman);
     }
 
-    private boolean isFreshDocument(String url) throws IOException {
-        final var crawler = new Crawler(url);
-        final var curLastModified = crawler.getLastModified();
-
-        final var docId = urlIndexer.getOrCreateDocumentId(url);
-        final var metadata = metadataIndexer.getMetadata(docId);
-
-        return metadata == null || curLastModified.isAfter(metadata.lastModified());
-    }
-
     /**
      * Stems a word by converting it to lowercase, removing any affixes using
      * Porter's algorithm,
@@ -79,6 +68,16 @@ public class Indexer implements AutoCloseable, SearchEngine {
             return Optional.empty();
 
         return Optional.of(word);
+    }
+
+    private boolean isFreshDocument(String url) throws IOException {
+        final var crawler = new Crawler(url);
+        final var curLastModified = crawler.getLastModified();
+
+        final var docId = urlIndexer.getOrCreateDocumentId(url);
+        final var metadata = metadataIndexer.getMetadata(docId);
+
+        return metadata == null || curLastModified.isAfter(metadata.lastModified());
     }
 
     /**
@@ -129,14 +128,6 @@ public class Indexer implements AutoCloseable, SearchEngine {
                     }
                 })
                 .toList();
-        IntStream.range(0, titles.size()).forEach(i -> {
-            try {
-                invertedIndex.addTitle(docId, titles.get(i), i);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to add title to inverted title index", e);
-            }
-        });
-
         final var words = crawler.extractWords()
                 .stream()
                 .map(this::stemWord)
@@ -149,13 +140,7 @@ public class Indexer implements AutoCloseable, SearchEngine {
                     }
                 })
                 .toList();
-        IntStream.range(0, words.size()).forEach(i -> {
-            try {
-                invertedIndex.addWord(docId, words.get(i), i);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to add word to inverted body index", e);
-            }
-        });
+        invertedIndex.addDocument(docId, titles, words);
     }
 
     /**

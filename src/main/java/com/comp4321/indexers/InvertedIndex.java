@@ -33,41 +33,35 @@ public class InvertedIndex {
                 new SafeBTree<>(recman, DOCID_TO_TFMAX, Comparator.<Integer>naturalOrder()));
     }
 
-    private void updateTFMax(Integer docId, Integer wordId) throws IOException {
-        final var posting = postingIndex.getPosting(docId, wordId);
-        final var tf = posting.titleLocations().size() + posting.bodyLocations().size();
+    private void updateTFMax(Integer docId) throws IOException {
+        final var wordIds = postingIndex.getForwardWords(docId);
 
-        final var curTFMax = docIdToTFMaxMap.find(docId);
-        if (curTFMax == null || curTFMax < tf)
-            docIdToTFMaxMap.insert(docId, tf);
+        final var tfMax = wordIds.stream().mapToInt(wordId -> {
+            try {
+                final var posting = postingIndex.getPosting(docId, wordId);
+                return posting.titleLocations().size() + posting.bodyLocations().size();
+            } catch (IOException e) {
+                throw new IndexerException("Error while updating TFMax", e);
+            }
+        }).max();
+
+        if (tfMax.isEmpty())
+            throw new IndexerException("Error while updating TFMax: no words found");
+
+        docIdToTFMaxMap.insert(docId, tfMax.getAsInt());
     }
 
     /**
-     * Adds a title to the posting index for a given document.
+     * Adds a document to the inverted index.
      *
-     * @param docId    The ID of the document
-     * @param titleId  The ID of the title
-     * @param location The location of the title
-     * @throws IOException if an error occurs while adding the title to the
-     *                     index.
+     * @param docId     the ID of the document to be added
+     * @param titleIds  the list of term IDs in the document's title in order
+     * @param bodyIds   the list of term IDs in the document's body in order
+     * @throws IOException if an I/O error occurs while adding the document
      */
-    public void addTitle(Integer docId, Integer titleId, Integer location) throws IOException {
-        postingIndex.addTitle(docId, titleId, location);
-        updateTFMax(docId, titleId);
-    }
-
-    /**
-     * Adds a word to the posting index for a given document.
-     *
-     * @param docId    the ID of the document
-     * @param wordId   the ID of the word
-     * @param location the location of the word
-     * @throws IOException if an error occurs while adding the word to the
-     *                     index
-     */
-    public void addWord(Integer docId, Integer wordId, Integer location) throws IOException {
-        postingIndex.addBody(docId, wordId, location);
-        updateTFMax(docId, wordId);
+    public void addDocument(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) throws IOException {
+        postingIndex.addDocument(docId, titleIds, bodyIds);
+        updateTFMax(docId);
     }
 
     /**

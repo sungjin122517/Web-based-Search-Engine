@@ -4,11 +4,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import com.comp4321.jdbm.SafeHTree;
@@ -29,57 +29,56 @@ public class PostingIndex {
         this.invertedIndexMap = invertedIndex;
     }
 
-    private void addWordLocation(Integer docId, Integer wordId, UnaryOperator<Posting> updateLocation)
-            throws IOException {
+    /**
+     * Adds a document to the posting index.
+     *
+     * @param docId    The ID of the document
+     * @param titleIds The list of word IDs in the document's title in order
+     * @param bodyIds  The list of word IDs in the document's body in order
+     * @throws IOException if an I/O error occurs.
+     */
+    public void addDocument(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) throws IOException {
         // Update the forward index
-        var forwardWords = forwardIndexMap.get(docId);
-        if (forwardWords == null)
-            forwardWords = new HashSet<>();
-        forwardWords.add(wordId);
-        forwardIndexMap.put(docId, forwardWords);
+        final var totalWords = new HashSet<Integer>(titleIds);
+        totalWords.addAll(bodyIds);
+        forwardIndexMap.put(docId, totalWords);
 
         // Update the inverted index
-        var postings = invertedIndexMap.get(wordId);
-        if (postings == null)
-            postings = new ArrayList<>();
-
-        // Binary search for the posting and add or update it
-        final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
-                Comparator.comparing(Posting::docId));
-        if (0 <= postingIdx && postingIdx < postings.size()) {
-            final var curPosting = postings.get(postingIdx);
-            final var newPosting = updateLocation.apply(curPosting);
-            postings.set(postingIdx, newPosting);
-        } else {
-            final var newPosting = updateLocation.apply(new Posting(docId));
-            postings.add(-postingIdx - 1, newPosting);
+        final var titleLocations = new HashMap<Integer, Set<Integer>>();
+        for (int i = 0; i < titleIds.size(); ++i) {
+            final var titleId = titleIds.get(i);
+            final var locations = titleLocations.getOrDefault(titleId, new HashSet<>());
+            locations.add(i);
+            titleLocations.put(titleId, locations);
         }
-        invertedIndexMap.put(wordId, postings);
-    }
 
-    /**
-     * Adds the location of a title occurrence for a specific document and word to
-     * the posting index.
-     *
-     * @param docId         The ID of the document.
-     * @param wordId        The ID of the word.
-     * @param titleLocation The location of the title occurrence.
-     * @throws IOException If an I/O error occurs.
-     */
-    public void addTitle(Integer docId, Integer wordId, Integer titleLocation) throws IOException {
-        addWordLocation(docId, wordId, posting -> posting.addTitleLocation(titleLocation));
-    }
+        final var bodyLocations = new HashMap<Integer, Set<Integer>>();
+        for (int i = 0; i < bodyIds.size(); ++i) {
+            final var bodyId = bodyIds.get(i);
+            final var locations = bodyLocations.getOrDefault(bodyId, new HashSet<>());
+            locations.add(i);
+            bodyLocations.put(bodyId, locations);
+        }
 
-    /**
-     * Adds a body location for a given document and word to the posting index.
-     *
-     * @param docId        The ID of the document.
-     * @param wordId       The ID of the word.
-     * @param bodyLocation The location of the word in the document's body.
-     * @throws IOException If an I/O error occurs.
-     */
-    public void addBody(Integer docId, Integer wordId, Integer bodyLocation) throws IOException {
-        addWordLocation(docId, wordId, posting -> posting.addBodyLocation(bodyLocation));
+        for (final var wordId : totalWords) {
+            final var postingToAdd = new Posting(docId, titleLocations.getOrDefault(wordId, new HashSet<>()),
+                    bodyLocations.getOrDefault(wordId, new HashSet<>()));
+
+            var postings = invertedIndexMap.get(wordId);
+            if (postings == null)
+                postings = new ArrayList<>();
+
+            final var postingIdx = Collections.binarySearch(postings, postingToAdd,
+                    Comparator.comparing(Posting::docId));
+            if (0 <= postingIdx && postingIdx < postings.size()) {
+                // It is an error if the posting already exists
+                throw new IndexerException(
+                        "Posting already exists for word ID " + wordId + " and document ID " + docId);
+            } else {
+                postings.add(-postingIdx - 1, postingToAdd);
+            }
+            invertedIndexMap.put(wordId, postings);
+        }
     }
 
     /**
