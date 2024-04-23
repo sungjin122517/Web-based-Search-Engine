@@ -75,7 +75,7 @@ public class JavalinServer {
         }
 
         public void start() {
-                app.start(8080);
+                app.start();
         }
 
         public void awaitTermination() throws InterruptedException {

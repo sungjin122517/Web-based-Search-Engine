@@ -59,6 +59,22 @@ public record SearchResult(Double score, String title, String url, ZonedDateTime
 
         final var sb = new StringBuilder();
 
+        sb.append(String.format("%.4f", score));
+        sb.append('\t');
+
+        sb.append(title);
+        sb.append('\n');
+
+        sb.append('\t');
+        sb.append(url);
+        sb.append('\n');
+
+        sb.append('\t');
+        sb.append(lastModified);
+        sb.append(", ");
+        sb.append(pageSize);
+        sb.append('\n');
+
         sb.append('\t');
         keywords().entrySet().stream()
                 .sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder()))
