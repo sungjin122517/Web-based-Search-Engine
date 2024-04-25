@@ -7,6 +7,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.assertj.core.api.Assertions;
 
@@ -28,7 +29,7 @@ public class URLIndexerTest implements AutoCloseable {
     }
 
     @Provide
-    Arbitrary<URL> urls() {
+    public Arbitrary<URL> urls() {
         return Arbitraries.strings().alpha().numeric().ofMinLength(1)
                 .<URL>map(s -> {
                     try {
@@ -40,8 +41,14 @@ public class URLIndexerTest implements AutoCloseable {
     }
 
     @Provide
-    Arbitrary<List<URL>> uniqueUrls() {
+    public Arbitrary<List<URL>> uniqueUrls() {
         return urls().list().uniqueElements();
+    }
+
+    @Property
+    public void getNonExistentURLThrowsException(@ForAll Integer docId) {
+        Assertions.assertThatThrownBy(() -> urlIndexer.getURL(docId))
+                .isInstanceOf(NoSuchElementException.class);
     }
 
     @Property

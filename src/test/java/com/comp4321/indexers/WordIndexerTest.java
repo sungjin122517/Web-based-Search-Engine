@@ -24,6 +24,11 @@ public class WordIndexerTest implements AutoCloseable {
     }
 
     @Property
+    public void getNonExistentWordReturnsNull(@ForAll Integer wordId) throws IOException {
+        Assertions.assertThat(wordIndexer.getWord(wordId)).isNull();
+    }
+
+    @Property
     public void createAndGetWord(@ForAll @NotEmpty String word) throws IOException {
         final var wordid = wordIndexer.getOrCreateId(word);
         final var retrievedWord = wordIndexer.getWord(wordid);
@@ -32,7 +37,7 @@ public class WordIndexerTest implements AutoCloseable {
     }
 
     @Property
-    void sameWordsHaveSameId(@ForAll @NotEmpty String word) throws IOException {
+    public void sameWordsHaveSameId(@ForAll @NotEmpty String word) throws IOException {
         final var wordid1 = wordIndexer.getOrCreateId(word);
         final var wordid2 = wordIndexer.getOrCreateId(word);
 
