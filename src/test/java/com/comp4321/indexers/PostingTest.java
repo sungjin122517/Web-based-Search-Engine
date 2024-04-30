@@ -34,7 +34,7 @@ class AddTitleLocationAction implements Action.Independent<Posting> {
                 posting -> {
                     final var beforeSize = posting.titleLocations().size();
 
-                    final var newPosting = posting.addTitleLocation(loc);
+                    final var newPosting = posting.withTitleLocation(loc);
                     Assertions.assertThat(newPosting.titleLocations())
                             .describedAs("Title locations should contain %d", loc)
                             .contains(loc);
@@ -59,7 +59,7 @@ class AddBodyLocationAction implements Action.Independent<Posting> {
                 posting -> {
                     final var beforeSize = posting.bodyLocations().size();
 
-                    final var newPosting = posting.addBodyLocation(loc);
+                    final var newPosting = posting.withBodyLocation(loc);
                     Assertions.assertThat(newPosting.bodyLocations())
                             .describedAs("Body locations should contain %d", loc)
                             .contains(loc);

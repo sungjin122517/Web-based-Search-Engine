@@ -34,8 +34,13 @@ public record SearchResult(Double score, String title, String url, ZonedDateTime
         return keywords().entrySet().stream()
                 .sorted(Comparator.comparing(Map.Entry::getValue, Comparator.reverseOrder()))
                 .limit(MAX_KEYWORD_COUNT)
-                .map(e -> e.getKey() + " " + e.getValue() + "; ")
-                .reduce("", String::concat);
+                .collect(StringBuilder::new, (sb, e) -> {
+                    sb.append(e.getKey());
+                    sb.append(' ');
+                    sb.append(e.getValue());
+                    sb.append("; ");
+                }, StringBuilder::append).toString();
+
     }
 
     /**

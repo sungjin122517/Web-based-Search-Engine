@@ -38,6 +38,9 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs.
      */
     public void addDocument(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) throws IOException {
+        // Remove the document if it already exists
+        removeDocument(docId);
+
         // Update the forward index
         final var totalWords = new HashSet<Integer>(titleIds);
         totalWords.addAll(bodyIds);
@@ -98,7 +101,7 @@ public class PostingIndex {
         for (final var wordId : forwardWords) {
             final var postings = invertedIndexMap.get(wordId);
             if (postings == null)
-                throw new IllegalStateException("Inconsistent index");
+                throw new IndexerException("Inconsistent index");
 
             final var postingIdx = Collections.binarySearch(postings, new Posting(docId),
                     Comparator.comparing(Posting::docId));
@@ -106,7 +109,7 @@ public class PostingIndex {
                 postings.remove(postingIdx);
                 invertedIndexMap.put(wordId, postings);
             } else {
-                throw new IllegalStateException("Inconsistent index");
+                throw new IndexerException("Inconsistent index");
             }
         }
     }
@@ -119,7 +122,11 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs while retrieving the forward words
      */
     public Set<Integer> getForwardWords(Integer docId) throws IOException {
-        return forwardIndexMap.get(docId);
+        final var words = forwardIndexMap.get(docId);
+        if (words == null)
+            return Set.of();
+
+        return words;
     }
 
     /**
@@ -130,7 +137,11 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs while retrieving the postings
      */
     public List<Posting> getPostings(Integer wordId) throws IOException {
-        return invertedIndexMap.get(wordId);
+        final var postings = invertedIndexMap.get(wordId);
+        if (postings == null)
+            return List.of();
+
+        return postings;
     }
 
     /**
@@ -164,7 +175,10 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs
      */
     public int getDF(Integer wordId) throws IOException {
-        return invertedIndexMap.get(wordId).size();
+        final var postings = invertedIndexMap.get(wordId);
+        if (postings == null)
+            return 0;
+        return postings.size();
     }
 
     private List<Posting> mergePhrase(List<Posting> prevPostings, List<Posting> curPostings) {
@@ -214,19 +228,22 @@ public class PostingIndex {
      * @throws IOException if an I/O error occurs while retrieving the postings
      */
     public Set<Integer> getDocumentsWithPhrase(List<Integer> phrase) throws IOException {
-        return phrase.stream()
-                .map(wordId -> {
-                    try {
-                        return getPostings(wordId);
-                    } catch (IOException e) {
-                        throw new IndexerException("An error occurred while retrieving postings", e);
-                    }
-                })
-                .reduce(this::mergePhrase)
-                .stream()
-                .flatMap(List::stream)
-                .map(Posting::docId)
-                .collect(Collectors.toSet());
+        final var phrasePostings = phrase.stream().map(wordId -> {
+            try {
+                return getPostings(wordId);
+            } catch (IOException e) {
+                throw new IndexerException("An error occurred while retrieving postings", e);
+            }
+        }).toList();
+
+        if (phrasePostings.isEmpty())
+            return Set.of();
+
+        // We don't use Stream::reduce because mergePhrase is not associative
+        var mergedPostings = phrasePostings.get(0);
+        for (int i = 1; i < phrasePostings.size(); ++i)
+            mergedPostings = mergePhrase(mergedPostings, phrasePostings.get(i));
+        return mergedPostings.stream().map(Posting::docId).collect(Collectors.toSet());
     }
 
     public void printAll() {

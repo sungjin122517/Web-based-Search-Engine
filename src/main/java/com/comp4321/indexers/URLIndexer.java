@@ -2,7 +2,7 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.util.Comparator;
-import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import com.comp4321.jdbm.SafeBTree;
 
@@ -51,15 +51,11 @@ public class URLIndexer {
      * Retrieves the URL associated with the given document ID.
      *
      * @param docId The document ID for which to retrieve the URL.
-     * @return The URL associated with the given document ID.
-     * @throws NoSuchElementException If the document ID is not found in the index.
+     * @return The URL associated with the document ID, if it exists.
      * @throws IOException            If an error occurs while retrieving the URL.
      */
-    public String getURL(Integer docId) throws IOException {
-        final var url = docIdToUrlMap.find(docId);
-        if (url == null)
-            throw new NoSuchElementException();
-        return url;
+    public Optional<String> getURL(Integer docId) throws IOException {
+        return Optional.ofNullable(docIdToUrlMap.find(docId));
     }
 
     public void printAll() {

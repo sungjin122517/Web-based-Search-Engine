@@ -37,7 +37,7 @@ public class MetadataIndexerTest implements AutoCloseable {
     @Property
     public void addAndGetMetadata(@ForAll int docId, @ForAll("metadata") Metadata metadata) throws IOException {
         metadataIndexer.addMetadata(docId, metadata);
-        final var retrievedMetadata = metadataIndexer.getMetadata(docId);
+        final var retrievedMetadata = metadataIndexer.getMetadata(docId).get();
         Assertions.assertThat(retrievedMetadata.title()).isEqualTo(metadata.title());
         Assertions.assertThat(retrievedMetadata.lastModified()).isEqualTo(metadata.lastModified());
         Assertions.assertThat(retrievedMetadata.pageSize()).isEqualTo(metadata.pageSize());

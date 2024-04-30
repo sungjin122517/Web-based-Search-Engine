@@ -25,13 +25,13 @@ public class WordIndexerTest implements AutoCloseable {
 
     @Property
     public void getNonExistentWordReturnsNull(@ForAll Integer wordId) throws IOException {
-        Assertions.assertThat(wordIndexer.getWord(wordId)).isNull();
+        Assertions.assertThat(wordIndexer.getWord(wordId)).isEmpty();
     }
 
     @Property
     public void createAndGetWord(@ForAll @NotEmpty String word) throws IOException {
         final var wordid = wordIndexer.getOrCreateId(word);
-        final var retrievedWord = wordIndexer.getWord(wordid);
+        final var retrievedWord = wordIndexer.getWord(wordid).get();
 
         Assertions.assertThat(retrievedWord).isEqualTo(word);
     }

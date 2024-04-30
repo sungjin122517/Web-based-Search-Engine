@@ -26,24 +26,24 @@ public record Posting(Integer docId, Set<Integer> titleLocations, Set<Integer> b
     }
 
     /**
-     * Adds a title location to the posting.
+     * Constructs a new Posting object with the addtional title location.
      * 
      * @param titleLocation The location of the term within the document's title.
      * @return A new Posting object with the added title location.
      */
-    public Posting addTitleLocation(Integer titleLocation) {
+    public Posting withTitleLocation(Integer titleLocation) {
         final var newTitleLocations = new TreeSet<>(titleLocations);
         newTitleLocations.add(titleLocation);
         return new Posting(docId, Collections.unmodifiableSet(newTitleLocations), bodyLocations);
     }
 
     /**
-     * Adds a body location to the posting.
+     * Constructs a new Posting object with the addtional body location.
      * 
      * @param bodyLocation The location of the term within the document's body.
      * @return A new Posting object with the added body location.
      */
-    public Posting addBodyLocation(Integer bodyLocation) {
+    public Posting withBodyLocation(Integer bodyLocation) {
         final var newBodyLocations = new TreeSet<>(bodyLocations);
         newBodyLocations.add(bodyLocation);
         return new Posting(docId, titleLocations, Collections.unmodifiableSet(newBodyLocations));

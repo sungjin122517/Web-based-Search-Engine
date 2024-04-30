@@ -54,9 +54,9 @@ public class InvertedIndex {
     /**
      * Adds a document to the inverted index.
      *
-     * @param docId     the ID of the document to be added
-     * @param titleIds  the list of term IDs in the document's title in order
-     * @param bodyIds   the list of term IDs in the document's body in order
+     * @param docId    the ID of the document to be added
+     * @param titleIds the list of term IDs in the document's title in order
+     * @param bodyIds  the list of term IDs in the document's body in order
      * @throws IOException if an I/O error occurs while adding the document
      */
     public void addDocument(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) throws IOException {
@@ -80,6 +80,8 @@ public class InvertedIndex {
         // and adding (tf * idf / tfMax)^2 for each term in the index
         final var totalDocuments = docIdToTFMaxMap.size();
         final var tfMax = docIdToTFMaxMap.find(docId);
+        if (tfMax == null)
+            throw new IndexerException("Error while calculating document length: tfMax not found");
 
         final var docLen = postingIndex.getForwardWords(docId).stream().mapToDouble(wordId -> {
             try {
@@ -117,11 +119,20 @@ public class InvertedIndex {
         final var totalDocuments = docIdToTFMaxMap.size();
 
         final var df = postingIndex.getDF(wordId);
+        if (df == 0)
+            return Map.of();
+
         final var idf = Math.log((double) totalDocuments / df);
-        return postingIndex.getPostings(wordId).stream().collect(Collectors.toMap(Posting::docId, posting -> {
+        final var postings = postingIndex.getPostings(wordId);
+        if (postings == null)
+            return Map.of();
+
+        return postings.stream().collect(Collectors.toMap(Posting::docId, posting -> {
             try {
                 final var docId = posting.docId();
                 final var tfMax = docIdToTFMaxMap.find(docId);
+                if (tfMax == null)
+                    throw new IndexerException("Error while calculating scores: tfMax not found");
 
                 final var titleTF = posting.titleLocations().size();
                 final var bodyTF = posting.bodyLocations().size();

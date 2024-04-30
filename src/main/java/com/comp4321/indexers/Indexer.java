@@ -2,6 +2,7 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.net.URL;
+import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,8 +56,7 @@ public class Indexer implements AutoCloseable, SearchEngine {
      *
      * @param word the word to be stemmed
      * @return an Optional containing the stemmed word if it is not a stop word and
-     *         not blank,
-     *         or an empty Optional otherwise
+     *         not blank, or an empty Optional otherwise
      */
     public Optional<String> stemWord(String word) {
         word = word.toLowerCase();
@@ -77,7 +77,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
         final var docId = urlIndexer.getOrCreateDocumentId(url);
         final var metadata = metadataIndexer.getMetadata(docId);
 
-        return metadata == null || curLastModified.isAfter(metadata.lastModified());
+        // If the document is not indexed, it is fresh
+        return metadata.map(Metadata::lastModified).map(curLastModified::isAfter).orElseGet(() -> true);
     }
 
     /**
@@ -94,10 +95,6 @@ public class Indexer implements AutoCloseable, SearchEngine {
         final var docId = urlIndexer.getOrCreateDocumentId(url);
         if (!isFreshDocument(url))
             return;
-
-        // Remove the old postings when the document is modified
-        // Other indexes automatically overwrite the old data
-        invertedIndex.removeDocument(docId);
 
         // Add the metadata to metadata index
         final var title = String.join(" ", crawler.extractTitle(false));
@@ -192,38 +189,42 @@ public class Indexer implements AutoCloseable, SearchEngine {
     }
 
     private SearchResult buildSearchResult(Integer docId, Double score) throws IOException {
-        final var metadata = metadataIndexer.getMetadata(docId);
-        final var url = urlIndexer.getURL(docId);
-
         final var keywordFrequencies = new HashMap<String, Integer>();
-        invertedIndex.getKeywordsWithFrequency(docId).forEach((wordId, freq) -> {
-            try {
-                final var word = wordIndexer.getWord(wordId);
-                keywordFrequencies.put(word, freq);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to get word", e);
-            }
-        });
+        invertedIndex.getKeywordsWithFrequency(docId)
+                .forEach((wordId, freq) -> {
+                    try {
+                        wordIndexer.getWord(wordId).ifPresent(word -> keywordFrequencies.put(word, freq));
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get word", e);
+                    }
+                });
 
-        final var parentLinks = linkIndexer.getParentLinks(docId).stream().map(parentId -> {
+        final var parentLinks = linkIndexer.getParentLinks(docId).stream().flatMap(parentId -> {
             try {
-                return urlIndexer.getURL(parentId);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to get URL", e);
-            }
-        }).collect(Collectors.toSet());
-
-        final var childLinks = linkIndexer.getChildLinks(docId).stream().map(childId -> {
-            try {
-                return urlIndexer.getURL(childId);
+                return urlIndexer.getURL(parentId).stream();
             } catch (IOException e) {
                 throw new IndexerException("Failed to get URL", e);
             }
         }).collect(Collectors.toSet());
 
-        return new SearchResult(score, metadata.title(), url, metadata.lastModified(),
-                metadata.pageSize(),
-                keywordFrequencies, parentLinks, childLinks);
+        final var childLinks = linkIndexer.getChildLinks(docId).stream().flatMap(childId -> {
+            try {
+                return urlIndexer.getURL(childId).stream();
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get URL", e);
+            }
+        }).collect(Collectors.toSet());
+
+        // While it is an error to not have metadata, I think it's better to return
+        // empty metadata than to throw an exception
+        final var metadata = metadataIndexer.getMetadata(docId);
+        final var title = metadata.map(Metadata::title).orElse("");
+        final var pageSize = metadata.map(Metadata::pageSize).orElse(0L);
+        final var lastModified = metadata.map(Metadata::lastModified).orElse(ZonedDateTime.now());
+        final var url = urlIndexer.getURL(docId).orElse("");
+
+        return new SearchResult(score, title, url, lastModified,
+                pageSize, keywordFrequencies, parentLinks, childLinks);
     }
 
     /**

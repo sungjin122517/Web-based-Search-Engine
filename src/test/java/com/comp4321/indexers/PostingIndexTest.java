@@ -66,13 +66,7 @@ record Document(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) {
 class AddDocumentAction implements Action.Dependent<PostingIndex> {
     @Override
     public Arbitrary<Transformer<PostingIndex>> transformer(PostingIndex index) {
-        final var docId = Arbitraries.integers().greaterOrEqual(1).filter(id -> {
-            try {
-                return index.getForwardWords(id) == null;
-            } catch (IOException e) {
-                return false;
-            }
-        });
+        final var docId = Arbitraries.integers().greaterOrEqual(1);
         final var titleIds = Arbitraries.integers()
                 .greaterOrEqual(1)
                 .list()
@@ -94,6 +88,13 @@ class AddDocumentAction implements Action.Dependent<PostingIndex> {
                         document.bodyIds().toString(),
                         document.titleIds().toString()),
                 curIndex -> {
+                    // Remove the document if it already exists
+                    try {
+                        curIndex.removeDocument(document.docId());
+                    } catch (IOException e) {
+                        Assertions.fail("Failed to remove document %d", document.docId());
+                    }
+
                     final var prevTitleDF = document.titleIds().stream()
                             .collect(Collectors.toMap(id -> id, id -> {
                                 try {

@@ -1,6 +1,7 @@
 package com.comp4321.indexers;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import com.comp4321.jdbm.SafeHTree;
 
@@ -26,8 +27,8 @@ public class MetadataIndexer {
      * @return The metadata for the document, or null if no metadata exists.
      * @throws IOException if an error occurs while getting the metadata.
      */
-    public Metadata getMetadata(int docId) throws IOException {
-        return metadataMap.get(docId);
+    public Optional<Metadata> getMetadata(int docId) throws IOException {
+        return Optional.ofNullable(metadataMap.get(docId));
     }
 
     /**
