@@ -2,6 +2,7 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.net.URL;
+import java.time.ZonedDateTime;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -11,14 +12,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.htmlparser.beans.LinkBean;
 import org.htmlparser.util.ParserException;
 
-import com.comp4321.IRUtilities.Crawler;
 import com.comp4321.SearchEngine;
 import com.comp4321.SearchResult;
+import com.comp4321.IRUtilities.Crawler;
 import com.comp4321.IRUtilities.Porter;
 import com.comp4321.IRUtilities.StopStem;
 
@@ -40,8 +40,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
     private final StopStem stopStem = new StopStem();
     private final Porter porter = new Porter();
 
-    public Indexer() throws IOException {
-        recman = RecordManagerFactory.createRecordManager(DB_NAME);
+    public Indexer(RecordManager recman) throws IOException {
+        this.recman = recman;
         urlIndexer = new URLIndexer(recman);
         linkIndexer = new LinkIndexer(recman);
         metadataIndexer = new MetadataIndexer(recman);
@@ -49,14 +49,8 @@ public class Indexer implements AutoCloseable, SearchEngine {
         invertedIndex = new InvertedIndex(recman);
     }
 
-    private boolean isFreshDocument(String url) throws IOException {
-        final var crawler = new Crawler(url);
-        final var curLastModified = crawler.getLastModified();
-
-        final var docId = urlIndexer.getOrCreateDocumentId(url);
-        final var metadata = metadataIndexer.getMetadata(docId);
-
-        return metadata == null || curLastModified.isAfter(metadata.lastModified());
+    public Indexer() throws IOException {
+        this(RecordManagerFactory.createRecordManager(DB_NAME));
     }
 
     /**
@@ -66,8 +60,7 @@ public class Indexer implements AutoCloseable, SearchEngine {
      *
      * @param word the word to be stemmed
      * @return an Optional containing the stemmed word if it is not a stop word and
-     *         not blank,
-     *         or an empty Optional otherwise
+     *         not blank, or an empty Optional otherwise
      */
     public Optional<String> stemWord(String word) {
         word = word.toLowerCase();
@@ -81,27 +74,31 @@ public class Indexer implements AutoCloseable, SearchEngine {
         return Optional.of(word);
     }
 
+    private boolean isFreshDocument(Crawler crawler) throws IOException {
+        final var curLastModified = crawler.getLastModified();
+
+        final var docId = urlIndexer.getOrCreateDocumentId(crawler.url);
+        final var metadata = metadataIndexer.getMetadata(docId);
+
+        // If the document is not indexed, it is fresh
+        return metadata.map(Metadata::lastModified).map(curLastModified::isAfter).orElseGet(() -> true);
+    }
+
     /**
      * Indexes a document by crawling the given URL, extracting metadata, links,
      * title, and words, and adding them to the respective indexes.
      *
      * @param url the URL of the document to be indexed
      */
-    public void indexDocument(String url) throws IOException, ParserException {
-        final var crawler = new Crawler(url);
-        final var curLastModified = crawler.getLastModified();
-
+    public void indexDocument(Crawler crawler) throws IOException, ParserException {
         // Skip if the document is already indexed and not modified
-        final var docId = urlIndexer.getOrCreateDocumentId(url);
-        if (!isFreshDocument(url))
+        final var docId = urlIndexer.getOrCreateDocumentId(crawler.url);
+        if (!isFreshDocument(crawler))
             return;
-
-        // Remove the old postings when the document is modified
-        // Other indexes automatically overwrite the old data
-        invertedIndex.removeDocument(docId);
 
         // Add the metadata to metadata index
         final var title = String.join(" ", crawler.extractTitle(false));
+        final var curLastModified = crawler.getLastModified();
         final var pageSize = crawler.getPageSize();
         metadataIndexer.addMetadata(docId, new Metadata(title, curLastModified, pageSize));
 
@@ -129,14 +126,6 @@ public class Indexer implements AutoCloseable, SearchEngine {
                     }
                 })
                 .toList();
-        IntStream.range(0, titles.size()).forEach(i -> {
-            try {
-                invertedIndex.addTitle(docId, titles.get(i), i);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to add title to inverted title index", e);
-            }
-        });
-
         final var words = crawler.extractWords()
                 .stream()
                 .map(this::stemWord)
@@ -149,13 +138,7 @@ public class Indexer implements AutoCloseable, SearchEngine {
                     }
                 })
                 .toList();
-        IntStream.range(0, words.size()).forEach(i -> {
-            try {
-                invertedIndex.addWord(docId, words.get(i), i);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to add word to inverted body index", e);
-            }
-        });
+        invertedIndex.addDocument(docId, titles, words);
     }
 
     /**
@@ -174,10 +157,11 @@ public class Indexer implements AutoCloseable, SearchEngine {
                 .setInitialMax(maxPages)
                 .setStyle(ProgressBarStyle.ASCII)
                 .build()) {
+            final var baseCrawler = new Crawler(baseURL);
             visited.add(baseURL);
-            if (isFreshDocument(baseURL)) {
+            if (isFreshDocument(baseCrawler)) {
                 queue.add(baseURL);
-                indexDocument(baseURL);
+                indexDocument(baseCrawler);
             }
             pb.step();
 
@@ -191,10 +175,11 @@ public class Indexer implements AutoCloseable, SearchEngine {
                         .forEach(link -> {
                             try {
                                 if (!visited.contains(link) && visited.size() < maxPages) {
+                                    final var crawler = new Crawler(link);
                                     visited.add(link);
-                                    if (isFreshDocument(link)) {
+                                    if (isFreshDocument(crawler)) {
                                         queue.add(link);
-                                        indexDocument(link);
+                                        indexDocument(crawler);
                                     }
                                     pb.step();
                                 }
@@ -207,38 +192,42 @@ public class Indexer implements AutoCloseable, SearchEngine {
     }
 
     private SearchResult buildSearchResult(Integer docId, Double score) throws IOException {
-        final var metadata = metadataIndexer.getMetadata(docId);
-        final var url = urlIndexer.getURL(docId);
-
         final var keywordFrequencies = new HashMap<String, Integer>();
-        invertedIndex.getKeywordsWithFrequency(docId).forEach((wordId, freq) -> {
-            try {
-                final var word = wordIndexer.getWord(wordId);
-                keywordFrequencies.put(word, freq);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to get word", e);
-            }
-        });
+        invertedIndex.getKeywordsWithFrequency(docId)
+                .forEach((wordId, freq) -> {
+                    try {
+                        wordIndexer.getWord(wordId).ifPresent(word -> keywordFrequencies.put(word, freq));
+                    } catch (IOException e) {
+                        throw new IndexerException("Failed to get word", e);
+                    }
+                });
 
-        final var parentLinks = linkIndexer.getParentLinks(docId).stream().map(parentId -> {
+        final var parentLinks = linkIndexer.getParentLinks(docId).stream().flatMap(parentId -> {
             try {
-                return urlIndexer.getURL(parentId);
-            } catch (IOException e) {
-                throw new IndexerException("Failed to get URL", e);
-            }
-        }).collect(Collectors.toSet());
-
-        final var childLinks = linkIndexer.getChildLinks(docId).stream().map(childId -> {
-            try {
-                return urlIndexer.getURL(childId);
+                return urlIndexer.getURL(parentId).stream();
             } catch (IOException e) {
                 throw new IndexerException("Failed to get URL", e);
             }
         }).collect(Collectors.toSet());
 
-        return new SearchResult(score, metadata.title(), url, metadata.lastModified(),
-                metadata.pageSize(),
-                keywordFrequencies, parentLinks, childLinks);
+        final var childLinks = linkIndexer.getChildLinks(docId).stream().flatMap(childId -> {
+            try {
+                return urlIndexer.getURL(childId).stream();
+            } catch (IOException e) {
+                throw new IndexerException("Failed to get URL", e);
+            }
+        }).collect(Collectors.toSet());
+
+        // While it is an error to not have metadata, I think it's better to return
+        // empty metadata than to throw an exception
+        final var metadata = metadataIndexer.getMetadata(docId);
+        final var title = metadata.map(Metadata::title).orElse("");
+        final var pageSize = metadata.map(Metadata::pageSize).orElse(0L);
+        final var lastModified = metadata.map(Metadata::lastModified).orElse(ZonedDateTime.now());
+        final var url = urlIndexer.getURL(docId).orElse("");
+
+        return new SearchResult(score, title, url, lastModified,
+                pageSize, keywordFrequencies, parentLinks, childLinks);
     }
 
     /**

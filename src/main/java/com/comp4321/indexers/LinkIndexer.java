@@ -26,31 +26,26 @@ public class LinkIndexer {
     }
 
     private void addChildLink(int parent, int child) throws IOException {
-        if (parent == child)
-            return;
-
-        final var childKey = Integer.valueOf(child);
-
-        var parentsValue = childToParentMap.get(childKey);
+        var parentsValue = childToParentMap.get(child);
         if (parentsValue == null)
-            parentsValue = new HashSet<Integer>();
+            parentsValue = new HashSet<>();
 
         parentsValue.add(parent);
-        childToParentMap.put(childKey, parentsValue);
+        childToParentMap.put(child, parentsValue);
     }
 
     private void removeChildLink(int parent, int child) throws IOException {
-        if (parent == child)
-            return;
-
-        final var childKey = Integer.valueOf(child);
-
-        final var parentsValue = childToParentMap.get(childKey);
+        final var parentsValue = childToParentMap.get(child);
         if (parentsValue == null)
             return;
 
         parentsValue.remove(parent);
-        childToParentMap.put(childKey, parentsValue);
+
+        // Update the child's parent links (if it's not empty)
+        if (parentsValue.isEmpty())
+            childToParentMap.remove(child);
+        else
+            childToParentMap.put(child, parentsValue);
     }
 
     /**
@@ -62,7 +57,7 @@ public class LinkIndexer {
      */
     public void addLinks(int docId, Set<Integer> links) throws IOException {
         removeLinks(docId);
-        parentToChildMap.put(Integer.valueOf(docId), links);
+        parentToChildMap.put(docId, links);
         links.stream().forEach(child -> {
             try {
                 addChildLink(docId, child);
@@ -77,20 +72,22 @@ public class LinkIndexer {
      *
      * @param docId the ID of the document whose links are to be removed
      */
-    public void removeLinks(int docId) throws IOException {
+    private void removeLinks(int docId) throws IOException {
+        final var oldLinks = parentToChildMap.get(docId);
+        if (oldLinks == null)
+            return;
+
         // Remove child links
-        final var oldLinks = parentToChildMap.get(Integer.valueOf(docId));
-        if (oldLinks != null)
-            oldLinks.stream().forEach(child -> {
-                try {
-                    removeChildLink(docId, child);
-                } catch (IOException e) {
-                    throw new IndexerException(String.format("DocId: %d", docId), e);
-                }
-            });
+        oldLinks.stream().forEach(child -> {
+            try {
+                removeChildLink(docId, child);
+            } catch (IOException e) {
+                throw new IndexerException(String.format("DocId: %d", docId), e);
+            }
+        });
 
         // Remove parent link
-        parentToChildMap.remove(Integer.valueOf(docId));
+        parentToChildMap.remove(docId);
     }
 
     /**
@@ -101,7 +98,11 @@ public class LinkIndexer {
      * @throws IOException if an I/O error occurs while retrieving the parent links
      */
     public Set<Integer> getParentLinks(Integer docId) throws IOException {
-        return childToParentMap.get(docId);
+        final var parentLinks = childToParentMap.get(docId);
+        if (parentLinks == null)
+            return Set.of();
+
+        return parentLinks;
     }
 
     /**
@@ -112,7 +113,11 @@ public class LinkIndexer {
      * @throws IOException if an I/O error occurs while retrieving the child links
      */
     public Set<Integer> getChildLinks(Integer docId) throws IOException {
-        return parentToChildMap.get(docId);
+        final var childLinks = parentToChildMap.get(docId);
+        if (childLinks == null)
+            return Set.of();
+
+        return childLinks;
     }
 
     public void printAll() {

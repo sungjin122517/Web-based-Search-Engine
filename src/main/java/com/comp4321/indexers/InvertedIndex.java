@@ -18,6 +18,8 @@ public class InvertedIndex {
     public static final String WORDID_TO_DOCID = "wordIdToDocId";
     public static final String DOCID_TO_TFMAX = "docIdToTfMax";
 
+    public static final double TITLE_MATCH_MULTIPLIER = 0.9;
+
     private final PostingIndex postingIndex;
     private final SafeBTree<Integer, Integer> docIdToTFMaxMap;
 
@@ -33,52 +35,35 @@ public class InvertedIndex {
                 new SafeBTree<>(recman, DOCID_TO_TFMAX, Comparator.<Integer>naturalOrder()));
     }
 
-    private void updateTFMax(Integer docId, Integer wordId) throws IOException {
-        final var posting = postingIndex.getPosting(docId, wordId);
-        final var tf = posting.titleLocations().size() + posting.bodyLocations().size();
+    private void updateTFMax(Integer docId) throws IOException {
+        final var wordIds = postingIndex.getForwardWords(docId);
 
-        final var curTFMax = docIdToTFMaxMap.find(docId);
-        if (curTFMax == null || curTFMax < tf)
-            docIdToTFMaxMap.insert(docId, tf);
+        final var tfMax = wordIds.stream().mapToInt(wordId -> {
+            try {
+                final var posting = postingIndex.getPosting(docId, wordId);
+                return posting.titleLocations().size() + posting.bodyLocations().size();
+            } catch (IOException e) {
+                throw new IndexerException("Error while updating TFMax", e);
+            }
+        }).max();
+
+        if (tfMax.isEmpty())
+            throw new IndexerException("Error while updating TFMax: no words found");
+
+        docIdToTFMaxMap.insert(docId, tfMax.getAsInt());
     }
 
     /**
-     * Adds a title to the posting index for a given document.
+     * Adds a document to the inverted index.
      *
-     * @param docId    The ID of the document
-     * @param titleId  The ID of the title
-     * @param location The location of the title
-     * @throws IOException if an error occurs while adding the title to the
-     *                     index.
+     * @param docId    the ID of the document to be added
+     * @param titleIds the list of term IDs in the document's title in order
+     * @param bodyIds  the list of term IDs in the document's body in order
+     * @throws IOException if an I/O error occurs while adding the document
      */
-    public void addTitle(Integer docId, Integer titleId, Integer location) throws IOException {
-        postingIndex.addTitle(docId, titleId, location);
-        updateTFMax(docId, titleId);
-    }
-
-    /**
-     * Adds a word to the posting index for a given document.
-     *
-     * @param docId    the ID of the document
-     * @param wordId   the ID of the word
-     * @param location the location of the word
-     * @throws IOException if an error occurs while adding the word to the
-     *                     index
-     */
-    public void addWord(Integer docId, Integer wordId, Integer location) throws IOException {
-        postingIndex.addBody(docId, wordId, location);
-        updateTFMax(docId, wordId);
-    }
-
-    /**
-     * Removes a document from the posting index.
-     *
-     * @param docId the ID of the document to be removed
-     * @throws IOException if an error occurs while removing the document
-     */
-    public void removeDocument(Integer docId) throws IOException {
-        postingIndex.removeDocument(docId);
-        docIdToTFMaxMap.remove(docId);
+    public void addDocument(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) throws IOException {
+        postingIndex.addDocument(docId, titleIds, bodyIds);
+        updateTFMax(docId);
     }
 
     private Double getDocumentLength(Integer docId) throws IOException {
@@ -86,6 +71,8 @@ public class InvertedIndex {
         // and adding (tf * idf / tfMax)^2 for each term in the index
         final var totalDocuments = docIdToTFMaxMap.size();
         final var tfMax = docIdToTFMaxMap.find(docId);
+        if (tfMax == null)
+            throw new IndexerException("Error while calculating document length: tfMax not found");
 
         final var docLen = postingIndex.getForwardWords(docId).stream().mapToDouble(wordId -> {
             try {
@@ -96,7 +83,8 @@ public class InvertedIndex {
 
                 final var tf = titleTF + bodyTF;
                 final var df = postingIndex.getDF(wordId);
-                final var idf = Math.log((double) totalDocuments / df);
+                final var idf = Math.log10((double) totalDocuments / df);
+
                 return Math.pow(tf * idf / tfMax, 2.0);
             } catch (IOException e) {
                 throw new IndexerException("Error while calculating document length", e);
@@ -109,25 +97,38 @@ public class InvertedIndex {
     private Map<Integer, Double> computeScoresForWord(Integer wordId) throws IOException {
         /*
          * Scores are calculated as:
-         * (a * title_tf + (1 - a) * body_tf) * log(N / df) / tfMax
+         * title_score = title_tf * log(N / df) / tfMax
+         * body_score = body_tf * log(N / df) / tfMax
+         * score = a * title_score + (1 - a) * body_score
+         * = (a * title_tf + (1 - a) * body_tf) * log(N / df) / tfMax
          * 
          * a: magic constant to give priority to title matches (default: 0.9)
          * title_tf: term frequency in the title of the document
          * body_tf: term frequency in the body of the document
          * N: total number of documents
          * df: document frequency of the term in either title or body
-         * tfMax: maximum (title_df + body_tf) in the document
+         * tfMax: maximum (title_tf + body_tf) in the document
          */
 
-        final var TITLE_MATCH_MULTIPLIER = 0.9;
         final var totalDocuments = docIdToTFMaxMap.size();
 
         final var df = postingIndex.getDF(wordId);
-        final var idf = Math.log((double) totalDocuments / df);
-        return postingIndex.getPostings(wordId).stream().collect(Collectors.toMap(Posting::docId, posting -> {
+        if (df == 0)
+            return Map.of();
+
+        // The base of the logarithm is irrelevant since we are only interested in the
+        // relative scores, which are not affected by the base
+        final var idf = Math.log10(((double) totalDocuments) / df);
+        final var postings = postingIndex.getPostings(wordId);
+        if (postings == null)
+            return Map.of();
+
+        return postings.stream().collect(Collectors.toMap(Posting::docId, posting -> {
             try {
                 final var docId = posting.docId();
                 final var tfMax = docIdToTFMaxMap.find(docId);
+                if (tfMax == null)
+                    throw new IndexerException("Error while calculating scores: tfMax not found");
 
                 final var titleTF = posting.titleLocations().size();
                 final var bodyTF = posting.bodyLocations().size();
@@ -158,6 +159,8 @@ public class InvertedIndex {
         }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Double::sum));
 
         // Normalize the scores by the document lengths
+        // We ignore query length normalization since we are only interested in the
+        // relative scores, which are not affected by the query length
         scores.replaceAll((docId, score) -> {
             try {
                 return score / getDocumentLength(docId);

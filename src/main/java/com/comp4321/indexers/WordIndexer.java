@@ -2,6 +2,7 @@ package com.comp4321.indexers;
 
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.Optional;
 
 import com.comp4321.jdbm.SafeBTree;
 
@@ -49,11 +50,11 @@ public class WordIndexer {
      * Retrieves the word associated with the given ID.
      *
      * @param id the ID of the word to retrieve
-     * @return the word associated with the given ID
+     * @return the word associated with the ID, if it exists
      * @throws IOException if an I/O error occurs while retrieving the word
      */
-    public String getWord(Integer id) throws IOException {
-        return idToWordMap.find(id);
+    public Optional<String> getWord(Integer id) throws IOException {
+        return Optional.ofNullable(idToWordMap.find(id));
     }
 
     public void printAll() {
