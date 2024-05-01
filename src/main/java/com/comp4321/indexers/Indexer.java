@@ -40,13 +40,17 @@ public class Indexer implements AutoCloseable, SearchEngine {
     private final StopStem stopStem = new StopStem();
     private final Porter porter = new Porter();
 
-    public Indexer() throws IOException {
-        recman = RecordManagerFactory.createRecordManager(DB_NAME);
+    public Indexer(RecordManager recman) throws IOException {
+        this.recman = recman;
         urlIndexer = new URLIndexer(recman);
         linkIndexer = new LinkIndexer(recman);
         metadataIndexer = new MetadataIndexer(recman);
         wordIndexer = new WordIndexer(recman);
         invertedIndex = new InvertedIndex(recman);
+    }
+
+    public Indexer() throws IOException {
+        this(RecordManagerFactory.createRecordManager(DB_NAME));
     }
 
     /**
@@ -70,11 +74,10 @@ public class Indexer implements AutoCloseable, SearchEngine {
         return Optional.of(word);
     }
 
-    private boolean isFreshDocument(String url) throws IOException {
-        final var crawler = new Crawler(url);
+    private boolean isFreshDocument(Crawler crawler) throws IOException {
         final var curLastModified = crawler.getLastModified();
 
-        final var docId = urlIndexer.getOrCreateDocumentId(url);
+        final var docId = urlIndexer.getOrCreateDocumentId(crawler.url);
         final var metadata = metadataIndexer.getMetadata(docId);
 
         // If the document is not indexed, it is fresh
@@ -87,17 +90,15 @@ public class Indexer implements AutoCloseable, SearchEngine {
      *
      * @param url the URL of the document to be indexed
      */
-    public void indexDocument(String url) throws IOException, ParserException {
-        final var crawler = new Crawler(url);
-        final var curLastModified = crawler.getLastModified();
-
+    public void indexDocument(Crawler crawler) throws IOException, ParserException {
         // Skip if the document is already indexed and not modified
-        final var docId = urlIndexer.getOrCreateDocumentId(url);
-        if (!isFreshDocument(url))
+        final var docId = urlIndexer.getOrCreateDocumentId(crawler.url);
+        if (!isFreshDocument(crawler))
             return;
 
         // Add the metadata to metadata index
         final var title = String.join(" ", crawler.extractTitle(false));
+        final var curLastModified = crawler.getLastModified();
         final var pageSize = crawler.getPageSize();
         metadataIndexer.addMetadata(docId, new Metadata(title, curLastModified, pageSize));
 
@@ -156,10 +157,11 @@ public class Indexer implements AutoCloseable, SearchEngine {
                 .setInitialMax(maxPages)
                 .setStyle(ProgressBarStyle.ASCII)
                 .build()) {
+            final var baseCrawler = new Crawler(baseURL);
             visited.add(baseURL);
-            if (isFreshDocument(baseURL)) {
+            if (isFreshDocument(baseCrawler)) {
                 queue.add(baseURL);
-                indexDocument(baseURL);
+                indexDocument(baseCrawler);
             }
             pb.step();
 
@@ -173,10 +175,11 @@ public class Indexer implements AutoCloseable, SearchEngine {
                         .forEach(link -> {
                             try {
                                 if (!visited.contains(link) && visited.size() < maxPages) {
+                                    final var crawler = new Crawler(link);
                                     visited.add(link);
-                                    if (isFreshDocument(link)) {
+                                    if (isFreshDocument(crawler)) {
                                         queue.add(link);
-                                        indexDocument(link);
+                                        indexDocument(crawler);
                                     }
                                     pb.step();
                                 }

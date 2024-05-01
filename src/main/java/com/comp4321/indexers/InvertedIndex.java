@@ -18,6 +18,8 @@ public class InvertedIndex {
     public static final String WORDID_TO_DOCID = "wordIdToDocId";
     public static final String DOCID_TO_TFMAX = "docIdToTfMax";
 
+    public static final double TITLE_MATCH_MULTIPLIER = 0.9;
+
     private final PostingIndex postingIndex;
     private final SafeBTree<Integer, Integer> docIdToTFMaxMap;
 
@@ -64,17 +66,6 @@ public class InvertedIndex {
         updateTFMax(docId);
     }
 
-    /**
-     * Removes a document from the posting index.
-     *
-     * @param docId the ID of the document to be removed
-     * @throws IOException if an error occurs while removing the document
-     */
-    public void removeDocument(Integer docId) throws IOException {
-        postingIndex.removeDocument(docId);
-        docIdToTFMaxMap.remove(docId);
-    }
-
     private Double getDocumentLength(Integer docId) throws IOException {
         // Calculate the document lengths by iterating over the inverted index
         // and adding (tf * idf / tfMax)^2 for each term in the index
@@ -92,7 +83,8 @@ public class InvertedIndex {
 
                 final var tf = titleTF + bodyTF;
                 final var df = postingIndex.getDF(wordId);
-                final var idf = Math.log((double) totalDocuments / df);
+                final var idf = Math.log10((double) totalDocuments / df);
+
                 return Math.pow(tf * idf / tfMax, 2.0);
             } catch (IOException e) {
                 throw new IndexerException("Error while calculating document length", e);
@@ -105,24 +97,28 @@ public class InvertedIndex {
     private Map<Integer, Double> computeScoresForWord(Integer wordId) throws IOException {
         /*
          * Scores are calculated as:
-         * (a * title_tf + (1 - a) * body_tf) * log(N / df) / tfMax
+         * title_score = title_tf * log(N / df) / tfMax
+         * body_score = body_tf * log(N / df) / tfMax
+         * score = a * title_score + (1 - a) * body_score
+         * = (a * title_tf + (1 - a) * body_tf) * log(N / df) / tfMax
          * 
          * a: magic constant to give priority to title matches (default: 0.9)
          * title_tf: term frequency in the title of the document
          * body_tf: term frequency in the body of the document
          * N: total number of documents
          * df: document frequency of the term in either title or body
-         * tfMax: maximum (title_df + body_tf) in the document
+         * tfMax: maximum (title_tf + body_tf) in the document
          */
 
-        final var TITLE_MATCH_MULTIPLIER = 0.9;
         final var totalDocuments = docIdToTFMaxMap.size();
 
         final var df = postingIndex.getDF(wordId);
         if (df == 0)
             return Map.of();
 
-        final var idf = Math.log((double) totalDocuments / df);
+        // The base of the logarithm is irrelevant since we are only interested in the
+        // relative scores, which are not affected by the base
+        final var idf = Math.log10(((double) totalDocuments) / df);
         final var postings = postingIndex.getPostings(wordId);
         if (postings == null)
             return Map.of();
@@ -163,6 +159,8 @@ public class InvertedIndex {
         }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Double::sum));
 
         // Normalize the scores by the document lengths
+        // We ignore query length normalization since we are only interested in the
+        // relative scores, which are not affected by the query length
         scores.replaceAll((docId, score) -> {
             try {
                 return score / getDocumentLength(docId);

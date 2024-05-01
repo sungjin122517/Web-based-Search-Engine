@@ -72,7 +72,7 @@ public class LinkIndexer {
      *
      * @param docId the ID of the document whose links are to be removed
      */
-    public void removeLinks(int docId) throws IOException {
+    private void removeLinks(int docId) throws IOException {
         final var oldLinks = parentToChildMap.get(docId);
         if (oldLinks == null)
             return;

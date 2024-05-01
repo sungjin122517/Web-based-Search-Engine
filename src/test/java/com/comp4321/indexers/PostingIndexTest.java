@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
-import java.util.List;
 import java.util.stream.Collectors;
 
 import org.assertj.core.api.Assertions;
@@ -60,9 +59,6 @@ public class PostingIndexTest implements AutoCloseable {
     }
 }
 
-record Document(Integer docId, List<Integer> titleIds, List<Integer> bodyIds) {
-}
-
 class AddDocumentAction implements Action.Dependent<PostingIndex> {
     @Override
     public Arbitrary<Transformer<PostingIndex>> transformer(PostingIndex index) {
@@ -80,7 +76,7 @@ class AddDocumentAction implements Action.Dependent<PostingIndex> {
                 .ofMaxSize(10)
                 .uniqueElements();
 
-        final var documents = Combinators.combine(docId, titleIds, bodyIds).as(Document::new);
+        final var documents = Combinators.combine(docId, titleIds, bodyIds).as(TestDocument::new);
 
         return documents.map(document -> Transformer.mutate(
                 String.format("Add document %d, Body Ids: %s, Title Ids: %s",
